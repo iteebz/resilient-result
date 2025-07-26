@@ -8,7 +8,7 @@ from .rate_limit import rate_limit
 from .resilient import Resilient, resilient
 from .result import Err, Ok, Result
 
-__version__ = "0.2.0"
+__version__ = "0.2.1"
 __all__ = [
     "Result",
     "Ok",

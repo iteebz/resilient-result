@@ -47,9 +47,11 @@ def decorator(
                         else:
                             result = await func(*args, **kwargs)
 
-                        # Smart return detection - preserve Result types, wrap others
+                        # Smart return detection - preserve Result types, wrap others, flatten nested Results
                         if isinstance(result, Result):
-                            return result
+                            return (
+                                result.flatten()
+                            )  # Automatically flatten nested Results
                         return Ok(result)
 
                     except Exception as e:
@@ -84,9 +86,11 @@ def decorator(
                     try:
                         result = func(*args, **kwargs)
 
-                        # Smart return detection - preserve Result types, wrap others
+                        # Smart return detection - preserve Result types, wrap others, flatten nested Results
                         if isinstance(result, Result):
-                            return result
+                            return (
+                                result.flatten()
+                            )  # Automatically flatten nested Results
                         return Ok(result)
 
                     except Exception as e:

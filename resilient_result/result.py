@@ -37,6 +37,22 @@ class Result(Generic[T, E]):
         """Allow if result: checks."""
         return self.success
 
+    def flatten(self) -> "Result[T, E]":
+        """Flatten nested Result objects - enables clean boundary discipline.
+
+        Example:
+            Result.ok(Result.ok("data")) -> Result.ok("data")
+            Result.ok(Result.fail("error")) -> Result.fail("error")
+        """
+        if not self.success:
+            return self  # Already failed, nothing to flatten
+
+        # If data is a Result, flatten it
+        if isinstance(self.data, Result):
+            return self.data.flatten()  # Recursively flatten
+
+        return self  # No nesting, return as-is
+
     def __repr__(self) -> str:
         if self.success:
             return f"Result.ok({repr(self.data)})"

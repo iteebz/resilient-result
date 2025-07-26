@@ -5,6 +5,53 @@ All notable changes to resilient-result will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.1] - Boundary Discipline 🎯
+
+**Enhancement Release**: Automatic nested Result flattening for clean boundary discipline.
+
+### ✨ New Features
+- **Automatic Result flattening**: Nested `Result.ok(Result.ok(data))` → `Result.ok(data)`
+- **Clean boundary discipline**: No more manual Result unwrapping in decorated functions
+- **Perfect DX**: Zero ceremony - decorators handle all Result complexity
+
+### 🔧 API Enhancements
+- **`Result.flatten()` method**: Recursively flattens nested Result objects
+- **Auto-flattening in decorators**: All `@resilient` patterns automatically flatten
+- **Preserves error propagation**: `Result.ok(Result.fail(error))` → `Result.fail(error)`
+
+### 📊 Real-World Impact
+- **Cogency integration**: Eliminates manual Result handling complexity
+- **15 new tests**: Comprehensive nested Result flattening coverage
+- **Zero breaking changes**: Backward compatible enhancement
+
+### 🎯 Boundary Discipline Pattern
+```python
+# Before v0.2.1 - manual Result handling
+@resilient.preprocess()
+async def process(llm, parse_json):
+    llm_result = await llm.run("prompt")
+    if not llm_result.success:
+        return llm_result
+    
+    parse_result = parse_json(llm_result.data) 
+    if not parse_result.success:
+        return parse_result
+    
+    return parse_result.data
+
+# After v0.2.1 - clean boundary discipline  
+@resilient.preprocess()
+async def process(llm, parse_json):
+    llm_response = await llm.run("prompt")     # Auto-unwrapped
+    parsed_data = parse_json(llm_response)     # Auto-unwrapped
+    return parsed_data                         # Auto-flattened
+```
+
+### 🚀 Performance
+- **Zero overhead**: Flattening only when needed
+- **Recursive safety**: Handles arbitrary nesting depth
+- **Memory efficient**: No additional object creation
+
 ## [0.2.0] - Foundation Ready 🚀
 
 **Major Release**: Complete architecture overhaul from basic Result type to extensible resilience framework.

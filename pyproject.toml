@@ -1,13 +1,13 @@
 [tool.poetry]
 name = "resilient-result"
-version = "0.1.0"
-description = "Clean error handling with Result pattern and @resilient decorators"
+version = "0.2.0"
+description = "Resilient decorators that return Result types instead of throwing exceptions"
 authors = ["resilient-result contributors"]
 license = "MIT"
 readme = "README.md"
 homepage = "https://github.com/iteebz/resilient-result"
 repository = "https://github.com/iteebz/resilient-result"
-keywords = ["result", "error-handling", "resilient", "monads", "functional"]
+keywords = ["result", "error-handling", "resilient", "retry", "timeout", "async"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
@@ -19,7 +19,8 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Topic :: Software Development :: Libraries :: Python Modules",
-    "Topic :: Utilities",
+    "Topic :: System :: Networking",
+    "Topic :: Internet :: WWW/HTTP",
 ]
 packages = [{include = "resilient_result"}]
 
@@ -68,6 +69,8 @@ target-version = ['py38']
 [tool.ruff]
 line-length = 88
 target-version = "py38"
+
+[tool.ruff.lint]
 select = [
     "E",  # pycodestyle errors
     "W",  # pycodestyle warnings
@@ -81,5 +84,5 @@ ignore = [
     "E501", # line too long, handled by black
 ]
 
-[tool.ruff.isort]
+[tool.ruff.lint.isort]
 known-first-party = ["resilient_result"]

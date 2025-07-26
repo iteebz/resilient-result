@@ -44,12 +44,12 @@ class Result(Generic[T, E]):
             return f"Result.fail({repr(self.error)})"
 
 
-# Rust-style aliases for streaming compatibility
-def Ok(data: T = None) -> Result[T, str]:
-    """Rust-style Ok constructor."""
+# Rust-style constructors that return proper Result instances
+def Ok(data: T = None) -> Result[T, Any]:
+    """Rust-style Ok constructor - returns proper Result instance."""
     return Result.ok(data)
 
 
-def Err(error: str) -> Result[Any, str]:
-    """Rust-style Err constructor."""
+def Err(error: E) -> Result[Any, E]:
+    """Rust-style Err constructor - returns proper Result instance."""
     return Result.fail(error)

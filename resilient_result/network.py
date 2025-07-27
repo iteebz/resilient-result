@@ -19,4 +19,8 @@ def network(retries: int = 2, error_type: Optional[type] = None):
             return None  # Retry
         return False  # Don't retry for other network errors
 
-    return decorator(handler=handle_network, retries=retries, error_type=error_type)
+    from .policies import Retry
+
+    return decorator(
+        handler=handle_network, retry=Retry(attempts=retries), error_type=error_type
+    )

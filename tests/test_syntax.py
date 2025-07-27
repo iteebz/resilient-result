@@ -2,7 +2,7 @@
 
 import pytest
 
-from resilient_result import resilient
+from resilient_result import Retry, resilient
 
 
 @pytest.mark.asyncio
@@ -19,10 +19,10 @@ async def test_bare_decorator():
 
 
 @pytest.mark.asyncio
-async def test_parameterized_decorator():
-    """Test @resilient(retries=3, timeout=5) syntax."""
+async def test_policy_decorator():
+    """Test @resilient(retry=Retry.api()) syntax."""
 
-    @resilient(retries=2, timeout=1)
+    @resilient(retry=Retry.api())
     async def param_func():
         return "configured"
 

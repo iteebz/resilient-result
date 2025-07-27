@@ -2,20 +2,29 @@
 
 import asyncio
 from functools import wraps
-from typing import Callable, Dict, Optional
+from typing import TYPE_CHECKING, Callable, Dict, Optional
+
+if TYPE_CHECKING:
+    from .policies import Backoff, Circuit, Retry
 
 # All plugins now unified in plugins.py
 
 
 def decorator(
     handler: Optional[Callable] = None,
-    retries: int = 3,
-    timeout: Optional[float] = None,
+    retry: Optional["Retry"] = None,
+    circuit: Optional["Circuit"] = None,
+    backoff: Optional["Backoff"] = None,
     error_type: Optional[type] = None,
 ):
-    """Clean base decorator with exponential backoff, timeout, and optional handler - returns Result objects."""
+    """Policy-based decorator with configurable retry, circuit, and backoff strategies."""
+    from .policies import Backoff, Retry
 
-    # Default to generic Exception for broad compatibility
+    # Set beautiful defaults
+    if retry is None:
+        retry = Retry()
+    if backoff is None:
+        backoff = Backoff.exp()
     if error_type is None:
         error_type = Exception
 
@@ -37,12 +46,12 @@ def decorator(
             async def async_wrapper(*args, **kwargs):
                 from .result import Err, Ok, Result
 
-                for attempt in range(retries):
+                for attempt in range(retry.attempts):
                     try:
-                        # Apply timeout if specified
-                        if timeout:
+                        # Apply timeout if specified in retry policy
+                        if retry.timeout:
                             result = await asyncio.wait_for(
-                                func(*args, **kwargs), timeout=timeout
+                                func(*args, **kwargs), timeout=retry.timeout
                             )
                         else:
                             result = await func(*args, **kwargs)
@@ -55,16 +64,14 @@ def decorator(
                         return Ok(result)
 
                     except Exception as e:
-                        if attempt < retries - 1:
+                        if attempt < retry.attempts - 1:
                             # Call handler to determine if we should retry
                             should_retry = await handler(e)
                             if should_retry is False:
                                 # Handler says stop retrying
                                 return Err(error_type(str(e)))
-                            # None or True means continue retrying
-                            await asyncio.sleep(
-                                2**attempt * 0.1
-                            )  # Reduced for faster tests
+                            # None or True means continue retrying - use configurable backoff
+                            await asyncio.sleep(backoff.calculate(attempt))
                             continue
 
                         # Final attempt failed
@@ -82,7 +89,7 @@ def decorator(
 
                 from .result import Err, Ok, Result
 
-                for attempt in range(retries):
+                for attempt in range(retry.attempts):
                     try:
                         result = func(*args, **kwargs)
 
@@ -94,9 +101,9 @@ def decorator(
                         return Ok(result)
 
                     except Exception as e:
-                        if attempt < retries - 1:
-                            # For sync functions, basic retry without handler
-                            time.sleep(2**attempt * 0.1)  # Reduced for faster tests
+                        if attempt < retry.attempts - 1:
+                            # For sync functions, use configurable backoff
+                            time.sleep(backoff.calculate(attempt))
                             continue
 
                         # Final attempt failed
@@ -117,22 +124,31 @@ class Resilient:
     def __call__(
         self,
         func=None,
-        retries: int = 3,
-        timeout: Optional[float] = None,
+        retry=None,
+        circuit=None,
+        backoff=None,
         error_type: Optional[type] = None,
-        **kwargs,
+        handler=None,
     ):
-        """Enable both @resilient and @resilient(retries=3, timeout=5) syntax."""
+        """Enable both @resilient and @resilient(retry=Retry.api()) syntax."""
         if func is None:
-            # Called as @resilient(retries=3, timeout=5) - return decorator factory
+            # Called as @resilient(retry=Retry.api()) - return decorator factory
             return decorator(
-                retries=retries, timeout=timeout, error_type=error_type, **kwargs
+                retry=retry,
+                circuit=circuit,
+                backoff=backoff,
+                error_type=error_type,
+                handler=handler,
             )
         else:
             # Called as @resilient - apply decorator directly
-            return decorator(retries=retries, timeout=timeout, error_type=error_type)(
-                func
-            )
+            return decorator(
+                retry=retry,
+                circuit=circuit,
+                backoff=backoff,
+                error_type=error_type,
+                handler=handler,
+            )(func)
 
     # Built-in patterns - all return Result types
     @classmethod

@@ -2,7 +2,7 @@
 
 import pytest
 
-from resilient_result import resilient
+from resilient_result import Retry, resilient
 
 
 class TestResilientAlias:
@@ -38,7 +38,7 @@ class TestResilientAlias:
 
         call_count = 0
 
-        @resilient(retries=2)
+        @resilient(retry=Retry(attempts=2))
         async def failing_function():
             nonlocal call_count
             call_count += 1

@@ -4,7 +4,7 @@ import asyncio
 
 import pytest
 
-from resilient_result import Ok, resilient
+from resilient_result import Ok, Retry, resilient
 
 
 class LLMError(Exception):
@@ -17,9 +17,7 @@ class LLMError(Exception):
 async def test_exact_vision_syntax():
     """Test @resilient(retries=3, timeout=5) matches original vision."""
 
-    @resilient(
-        retries=1, timeout=0.05, error_type=LLMError
-    )  # Reduced retries and timeout
+    @resilient(retry=Retry(attempts=1, timeout=0.05), error_type=LLMError)
     async def mock_llm():
         await asyncio.sleep(0.1)  # Will timeout
         return "should not reach"
@@ -33,7 +31,7 @@ async def test_exact_vision_syntax():
 async def test_custom_error_preservation():
     """Test Result[T, CustomError] type preservation."""
 
-    @resilient(retries=1, error_type=LLMError)
+    @resilient(retry=Retry(attempts=1), error_type=LLMError)
     async def failing_llm():
         raise Exception("LLM failed")
 
@@ -49,9 +47,7 @@ async def test_timeout_with_retries():
 
     call_count = 0
 
-    @resilient(
-        retries=1, timeout=0.05, error_type=LLMError
-    )  # Reduced retries and timeout
+    @resilient(retry=Retry(attempts=1, timeout=0.05), error_type=LLMError)
     async def slow_llm():
         nonlocal call_count
         call_count += 1
@@ -68,7 +64,7 @@ async def test_timeout_with_retries():
 async def test_success_case_unchanged():
     """Test successful operations work perfectly."""
 
-    @resilient(retries=3, timeout=1, error_type=LLMError)
+    @resilient(retry=Retry(attempts=3, timeout=1), error_type=LLMError)
     async def working_llm():
         return "Generated story about dragons"
 
@@ -81,7 +77,7 @@ async def test_success_case_unchanged():
 async def test_result_passthrough():
     """Test functions returning Result[T, E] pass through unchanged."""
 
-    @resilient(retries=1, error_type=LLMError)
+    @resilient(retry=Retry(attempts=1), error_type=LLMError)
     async def returns_result():
         return Ok("already wrapped")
 

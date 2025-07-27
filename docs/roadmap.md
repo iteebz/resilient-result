@@ -31,13 +31,11 @@
 
 #### 1. Circuit Breaker Enhancements
 **Current Issues**:
-- ❌ Returns string instead of proper Result[T, E]
 - ❌ No half-open state for recovery testing
 - ❌ No exponential backoff for recovery attempts
 - ❌ No metrics/observability hooks
 
 **v0.3.0 Goals**:
-- ✅ Proper Result[T, E] error handling
 - ✅ Half-open state with configurable recovery testing
 - ✅ Exponential backoff with jitter for recovery
 - ✅ Metrics collection (failure rates, state transitions)
@@ -81,10 +79,9 @@
 **v0.3.0 Goals**:
 - ✅ OpenTelemetry tracing integration
 - ✅ Prometheus metrics collection
-- ✅ Configurable backoff strategies (exponential, linear, custom)
+- ✅ Jitter for backoff strategies
 - ✅ Bulkhead pattern implementation
 - ✅ Graceful degradation with fallback chains
-- ✅ Timeout hierarchies (operation, request, circuit)
 
 ### New Production Patterns
 

@@ -4,7 +4,7 @@ import asyncio
 
 import pytest
 
-from resilient_result import Err, Ok, Result, resilient
+from resilient_result import Backoff, Err, Ok, Result, Retry, resilient
 
 
 class CustomError(Exception):
@@ -59,27 +59,27 @@ async def test_retries():
     """Test retry mechanism."""
     call_count = 0
 
-    @resilient(retries=2)  # Reduced from 3
+    @resilient(retry=Retry(attempts=2), backoff=Backoff.fixed(delay=0.001))
     async def retry_func():
         nonlocal call_count
         call_count += 1
-        if call_count < 2:  # Reduced from 3
+        if call_count < 2:
             raise ValueError("not yet")
         return "success"
 
     result = await retry_func()
     assert result.success
     assert result.data == "success"
-    assert call_count == 2  # Reduced from 3
+    assert call_count == 2
 
 
 @pytest.mark.asyncio
 async def test_timeout():
     """Test timeout functionality."""
 
-    @resilient(timeout=0.05)  # Reduced from 0.1
+    @resilient(retry=Retry(attempts=1, timeout=0.05))
     async def slow_func():
-        await asyncio.sleep(0.1)  # Reduced from 0.2
+        await asyncio.sleep(0.1)
         return "too slow"
 
     result = await slow_func()
@@ -120,7 +120,7 @@ async def test_handler_contract():
             return None  # Retry
         return False  # Stop retrying
 
-    @resilient(retries=3, handler=custom_handler)  # Reduced from 5
+    @resilient(retry=Retry(attempts=3), handler=custom_handler)
     async def fail_func():
         raise ValueError("always fails")
 
@@ -132,7 +132,7 @@ async def test_handler_contract():
 def test_sync_support():
     """Test sync function support."""
 
-    @resilient(retries=1)  # Reduced from 2
+    @resilient(retry=Retry(attempts=1))
     def sync_func():
         return "sync success"
 
@@ -142,18 +142,18 @@ def test_sync_support():
 
     call_count = 0
 
-    @resilient(retries=2)  # Reduced from 3
+    @resilient(retry=Retry(attempts=2), backoff=Backoff.fixed(delay=0.001))
     def sync_retry():
         nonlocal call_count
         call_count += 1
-        if call_count < 2:  # Reduced from 3
+        if call_count < 2:
             raise ValueError("not yet")
         return "sync retry success"
 
     result = sync_retry()
     assert result.success
     assert result.data == "sync retry success"
-    assert call_count == 2  # Reduced from 3
+    assert call_count == 2
 
 
 def test_result_types():

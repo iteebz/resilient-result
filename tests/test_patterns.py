@@ -1,15 +1,15 @@
-"""Test registry system and built-in patterns."""
+"""Test built-in patterns with v0.2.3 policy API."""
 
 import pytest
 
-from resilient_result import NetworkError, ParsingError, resilient
+from resilient_result import NetworkError, ParsingError, Retry, resilient
 
 
 @pytest.mark.asyncio
 async def test_network_pattern():
     """Test @resilient.network built-in pattern."""
 
-    @resilient.network(retries=2)
+    @resilient.network()
     async def network_call():
         raise ConnectionError("network timeout")
 
@@ -22,7 +22,7 @@ async def test_network_pattern():
 async def test_parsing_pattern():
     """Test @resilient.parsing built-in pattern."""
 
-    @resilient.parsing(retries=2)
+    @resilient.parsing()
     async def parse_data():
         raise ValueError("invalid json")
 
@@ -33,7 +33,7 @@ async def test_parsing_pattern():
 
 @pytest.mark.asyncio
 async def test_custom_registry():
-    """Test custom pattern registration."""
+    """Test custom pattern registration with policy API."""
 
     class DatabaseError(Exception):
         pass
@@ -47,12 +47,15 @@ async def test_custom_registry():
 
     resilient.register(
         "database",
-        lambda retries=3, **kwargs: decorator(
-            handler=db_handler, retries=retries, error_type=DatabaseError, **kwargs
+        lambda retry=None, **kwargs: decorator(
+            handler=db_handler,
+            retry=retry or Retry.db(),
+            error_type=DatabaseError,
+            **kwargs,
         ),
     )
 
-    @resilient.database(retries=2)
+    @resilient.database()
     async def db_operation():
         raise Exception("database deadlock detected")
 
@@ -73,26 +76,20 @@ async def test_registry_error_handling():
 
 
 @pytest.mark.asyncio
-async def test_direct_network_import():
-    """Test direct network pattern import."""
-    from resilient_result import network
+async def test_direct_pattern_imports():
+    """Test direct pattern imports with v0.2.3 API."""
+    from resilient_result import network, parsing
 
-    @network(retries=1)
+    @network()
     async def network_call():
         raise ConnectionError("timeout")
 
-    result = await network_call()
-    assert not result.success
-
-
-@pytest.mark.asyncio
-async def test_direct_parsing_import():
-    """Test direct parsing pattern import."""
-    from resilient_result import parsing
-
-    @parsing(retries=1)
+    @parsing()
     async def parse_call():
         raise ValueError("invalid json")
 
-    result = await parse_call()
-    assert not result.success
+    net_result = await network_call()
+    parse_result = await parse_call()
+
+    assert not net_result.success
+    assert not parse_result.success

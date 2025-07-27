@@ -2,44 +2,51 @@
 
 All notable changes to resilient-result will be documented in this file.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+## [0.3.0] - 2025-07-27 - Policy Architecture
 
-## [0.2.2] - 2024-01-XX
+**Major Enhancement**: Policy-based configuration replaces primitive parameters.
 
-### Added
-- `unwrap()` function for extracting data from Result objects
-- `Result.collect()` method for parallel async operations
-- `@resilient.fallback()` pattern for automatic mode switching on errors  
-- Enhanced `@resilient` syntax supporting both `@resilient` and `@resilient()` decorators
+### ✨ New Policy System
+- **`Retry` policy**: `Retry.api()`, `Retry.db()`, `Retry.ml()` factory methods
+- **`Circuit` policy**: `Circuit.fast()`, `Circuit.standard()` presets
+- **`Backoff` policy**: `Backoff.exp()`, `Backoff.linear()`, `Backoff.fixed()` strategies
+- **Beautiful API**: `@resilient(retry=Retry.api(), backoff=Backoff.exp())`
 
-### Details
-- `unwrap(result)` extracts `result.data` or raises the contained exception
-- `Result.collect([op1(), op2()])` runs operations in parallel, returns `Result.ok([data1, data2])` if all succeed
-- `@resilient.fallback("attr", "fallback_value")` automatically modifies state on error and retries
-- `@resilient` alias works identically to `@resilient()` via existing `__call__` method
+### 🔧 API Changes
+- **Timeout moved**: Now part of `Retry` policy, not top-level parameter
+- **Configurable backoff**: Replaces hardcoded `2**attempt * 0.1` exponential backoff
+- **Policy objects**: All configuration via policy objects, not primitives
 
-### Usage
+### 💥 Breaking Changes
+- **No backward compatibility**: Clean break from primitive-based API
+- **Import changes**: Must import `Retry`, `Circuit`, `Backoff` policies
+- **Parameter changes**: `@resilient(retries=3)` → `@resilient(retry=Retry(attempts=3))`
+
+### 📊 Policy Examples
 ```python
-from resilient_result import resilient, unwrap, Result
+# API calls - moderate retries, reasonable timeout
+@resilient(retry=Retry.api())
 
-@resilient
-async def api_call():
-    return await http.get("https://api.example.com")
+# Database operations - more retries, longer timeout  
+@resilient(retry=Retry.db(), backoff=Backoff.linear())
 
-data = unwrap(await api_call())
-
-operations = [fetch_user(id), fetch_profile(id)]
-result = await Result.collect(operations)
-if result.success:
-    user, profile = result.data
+# Custom fine-grained control
+@resilient(
+    retry=Retry(attempts=5, timeout=10),
+    backoff=Backoff.exp(delay=0.5, factor=1.5),
+    circuit=Circuit(failures=3, window=60)
+)
 ```
 
-### Backward Compatibility
-- All v0.2.1 code continues to work unchanged
-- No breaking changes to existing APIs
+## [0.2.2] - 2025-07-27 - Enhanced Developer Experience
 
-## [0.2.1] - Boundary Discipline 🎯
+### Added
+- `unwrap()` function for clean Result extraction
+- `Result.collect()` method for parallel async operations
+- `@resilient.fallback()` pattern for automatic mode switching
+- Enhanced `@resilient` syntax with bare decorator support
+
+## [0.2.1] - 2025-07-26 - Boundary Discipline
 
 **Enhancement Release**: Automatic nested Result flattening for clean boundary discipline.
 
@@ -86,7 +93,7 @@ async def process(llm, parse_json):
 - **Recursive safety**: Handles arbitrary nesting depth
 - **Memory efficient**: No additional object creation
 
-## [0.2.0] - Foundation Ready 🚀
+## [0.2.0] - 2025-07-26 - Foundation Ready
 
 **Major Release**: Complete architecture overhaul from basic Result type to extensible resilience framework.
 

@@ -6,13 +6,14 @@ from .network import network
 from .parsing import parsing
 from .rate_limit import rate_limit
 from .resilient import Resilient, resilient
-from .result import Err, Ok, Result
+from .result import Err, Ok, Result, unwrap
 
-__version__ = "0.2.1"
+__version__ = "0.2.2"
 __all__ = [
     "Result",
     "Ok",
     "Err",
+    "unwrap",
     "resilient",
     "Resilient",
     "network",

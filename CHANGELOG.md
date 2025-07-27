@@ -5,6 +5,40 @@ All notable changes to resilient-result will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.2] - 2024-01-XX
+
+### Added
+- `unwrap()` function for extracting data from Result objects
+- `Result.collect()` method for parallel async operations
+- `@resilient.fallback()` pattern for automatic mode switching on errors  
+- Enhanced `@resilient` syntax supporting both `@resilient` and `@resilient()` decorators
+
+### Details
+- `unwrap(result)` extracts `result.data` or raises the contained exception
+- `Result.collect([op1(), op2()])` runs operations in parallel, returns `Result.ok([data1, data2])` if all succeed
+- `@resilient.fallback("attr", "fallback_value")` automatically modifies state on error and retries
+- `@resilient` alias works identically to `@resilient()` via existing `__call__` method
+
+### Usage
+```python
+from resilient_result import resilient, unwrap, Result
+
+@resilient
+async def api_call():
+    return await http.get("https://api.example.com")
+
+data = unwrap(await api_call())
+
+operations = [fetch_user(id), fetch_profile(id)]
+result = await Result.collect(operations)
+if result.success:
+    user, profile = result.data
+```
+
+### Backward Compatibility
+- All v0.2.1 code continues to work unchanged
+- No breaking changes to existing APIs
+
 ## [0.2.1] - Boundary Discipline 🎯
 
 **Enhancement Release**: Automatic nested Result flattening for clean boundary discipline.

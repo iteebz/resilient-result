@@ -174,6 +174,38 @@ class Resilient:
         return result_rate_limit_decorator
 
     @classmethod
+    def fallback(cls, primary_mode: str, fallback_mode: str, **kwargs):
+        """@resilient.fallback - Fallback between modes on error."""
+
+        async def fallback_handler(error):
+            # Access function args through handler closure
+            if (
+                hasattr(fallback_handler, "_current_args")
+                and len(fallback_handler._current_args) > 0
+                and hasattr(fallback_handler._current_args[0], primary_mode)
+            ):
+                # Switch mode and retry
+                setattr(fallback_handler._current_args[0], primary_mode, fallback_mode)
+                return None  # Retry with modified state
+            return False  # No recovery possible
+
+        def decorator_with_fallback(func):
+            decorated_func = decorator(handler=fallback_handler, **kwargs)(func)
+
+            @wraps(decorated_func)
+            async def wrapper(*args, **func_kwargs):
+                fallback_handler._current_args = args
+                try:
+                    return await decorated_func(*args, **func_kwargs)
+                finally:
+                    if hasattr(fallback_handler, "_current_args"):
+                        delattr(fallback_handler, "_current_args")
+
+            return wrapper
+
+        return decorator_with_fallback
+
+    @classmethod
     def register(cls, name: str, decorator_factory: Callable):
         """Register a domain-specific @resilient pattern."""
         cls._registry[name] = decorator_factory

@@ -13,16 +13,16 @@ format:
     poetry run black .
     poetry run ruff format .
 
-# Lint and fix with ruff
+# Lint and check with ruff
 lint:
     poetry run ruff check .
 
 # Lint and auto-fix with ruff  
-lint-fix:
+fix:
     poetry run ruff check --fix .
 
 # Format + lint (full cleanup)
-clean: format lint-fix
+clean: format fix
 
 # Install dependencies
 install:
@@ -36,4 +36,4 @@ build:
 check: lint test
 
 # Development setup
-dev: install format lint-fix test
+dev: install format fix test

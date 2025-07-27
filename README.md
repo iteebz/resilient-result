@@ -8,7 +8,7 @@
 **Beautiful resilient decorators that return Result types instead of throwing exceptions.**
 
 ```python
-from resilient_result import resilient, Ok, Err
+from resilient_result import resilient, Ok, Err, unwrap
 
 @resilient(retries=3, timeout=5)
 async def call_api(url: str) -> str:
@@ -160,11 +160,63 @@ async def store_context(data):
 - **Concurrency**: Thread-safe, async-first design
 - **Test suite**: Comprehensive coverage, <2s runtime
 
-### v0.2.0 Status: Foundation Ready
+### v0.2.2 Status: Ergonomic & Powerful
 ✅ **Proven extensible architecture** - Registry system enables domain-specific patterns  
-✅ **Beautiful decorator API** - Clean `@resilient.pattern()` syntax  
+✅ **Beautiful decorator API** - Clean `@resilient.pattern()` and `@resilient` syntax  
 ✅ **Type-safe Result system** - Ok/Err prevents ignored errors  
-✅ **Real-world proven** - Successfully integrated with production AI systems  
+✅ **Real-world proven** - Successfully integrated with production AI systems
+✅ **Enhanced ergonomics** - `unwrap()`, `Result.collect()`, and fallback patterns
+
+## New in v0.2.2: Enhanced Developer Experience
+
+### `unwrap()` Function - Clean Result Extraction
+```python
+from resilient_result import unwrap
+
+@resilient
+async def api_call():
+    return "success"
+
+# Clean extraction - raises exception if failed
+data = unwrap(await api_call())  # "success"
+```
+
+### `Result.collect()` - Parallel Operations Made Easy
+```python
+# Run multiple async operations, collect all results
+operations = [
+    fetch_user(user_id),
+    fetch_profile(user_id),
+    fetch_settings(user_id)
+]
+
+result = await Result.collect(operations)
+if result.success:
+    user, profile, settings = result.data  # All succeeded
+else:
+    print(f"Operation failed: {result.error}")  # First failure
+```
+
+### `@resilient.fallback()` - Mode Switching Pattern  
+```python
+# Automatically fallback between modes on error
+@resilient.fallback("complexity", "simple", retries=2)
+async def adaptive_processing(state):
+    if state.complexity == "advanced":
+        return await complex_algorithm(state)
+    else:
+        return await simple_algorithm(state)
+
+# On error, automatically switches state.complexity to "simple" and retries
+```
+
+### Enhanced `@resilient` Syntax
+```python
+# Both syntaxes work identically
+@resilient                    # Clean, no parentheses  
+@resilient()                  # Traditional with parentheses
+@resilient(retries=5)         # With parameters
+```
 
 Current patterns provide solid foundation with basic implementations suitable for development and basic production use.
 

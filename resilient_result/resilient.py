@@ -2,83 +2,81 @@
 
 import asyncio
 from functools import wraps
-from typing import TYPE_CHECKING, Callable, Dict, Optional
+from typing import TYPE_CHECKING, Optional
 
 if TYPE_CHECKING:
-    from .policies import Backoff, Circuit, Retry
+    from .policies import Backoff
 
 # All plugins now unified in plugins.py
 
 
-def decorator(
-    handler: Optional[Callable] = None,
-    retry: Optional["Retry"] = None,
-    circuit: Optional["Circuit"] = None,
+def retry(
+    attempts: int = 3,
     backoff: Optional["Backoff"] = None,
     error_type: Optional[type] = None,
+    handler=None,
 ):
-    """Policy-based decorator with configurable retry, circuit, and backoff strategies."""
-    from .policies import Backoff, Retry
+    """Pure retry decorator - clean, orthogonal, beautiful."""
+    from .policies import Backoff
 
-    # Set beautiful defaults
-    if retry is None:
-        retry = Retry()
     if backoff is None:
         backoff = Backoff.exp()
     if error_type is None:
         error_type = Exception
 
-    # Smart default handler - no ceremony for basic retry
-    if handler is None:
+    async def _should_stop_retrying_async(e, attempt):
+        """Check if we should stop retrying based on async handler."""
+        if handler and asyncio.iscoroutinefunction(handler):
+            handler_result = await handler(e)
+            if handler_result is False:
+                return True
+        elif handler:
+            handler_result = handler(e)
+            if handler_result is False:
+                return True
+        return False
 
-        async def default_handler(error: Exception) -> Optional[bool]:
-            """Default handler returns None to trigger retry."""
-            return None  # Always retry until max attempts
+    def _should_stop_retrying_sync(e, attempt):
+        """Check if we should stop retrying based on sync handler."""
+        if handler and not asyncio.iscoroutinefunction(handler):
+            handler_result = handler(e)
+            if handler_result is False:
+                return True
+        return False
 
-        handler = default_handler
+    def _format_error(e):
+        """Format error according to error_type preference."""
+        return e if error_type is Exception else error_type(str(e))
 
-    def decorator_factory(func):
-        is_async = asyncio.iscoroutinefunction(func)
+    def decorator(func):
+        from .result import Err, Ok, Result
 
-        if is_async:
+        if asyncio.iscoroutinefunction(func):
 
             @wraps(func)
             async def async_wrapper(*args, **kwargs):
-                from .result import Err, Ok, Result
-
-                for attempt in range(retry.attempts):
+                last_exception = None
+                for attempt in range(attempts):
                     try:
-                        # Apply timeout if specified in retry policy
-                        if retry.timeout:
-                            result = await asyncio.wait_for(
-                                func(*args, **kwargs), timeout=retry.timeout
-                            )
-                        else:
-                            result = await func(*args, **kwargs)
-
-                        # Smart return detection - preserve Result types, wrap others, flatten nested Results
-                        if isinstance(result, Result):
-                            return (
-                                result.flatten()
-                            )  # Automatically flatten nested Results
-                        return Ok(result)
-
+                        result = await func(*args, **kwargs)
+                        return (
+                            Ok(result)
+                            if not isinstance(result, Result)
+                            else result.flatten()
+                        )
                     except Exception as e:
-                        if attempt < retry.attempts - 1:
-                            # Call handler to determine if we should retry
-                            should_retry = await handler(e)
-                            if should_retry is False:
-                                # Handler says stop retrying
-                                return Err(error_type(str(e)))
-                            # None or True means continue retrying - use configurable backoff
+                        last_exception = e
+
+                        # Check if we should stop retrying
+                        if await _should_stop_retrying_async(e, attempt):
+                            return Err(_format_error(e))
+
+                        # If this is the last attempt, don't sleep
+                        if attempt < attempts - 1:
                             await asyncio.sleep(backoff.calculate(attempt))
-                            continue
 
-                        # Final attempt failed
-                        return Err(error_type(str(e)))
-
-                # Should never reach here
-                return Err(error_type("Max retries exceeded"))
+                # Return the last exception we caught
+                return Err(_format_error(last_exception))
 
             return async_wrapper
         else:
@@ -87,152 +85,159 @@ def decorator(
             def sync_wrapper(*args, **kwargs):
                 import time
 
-                from .result import Err, Ok, Result
-
-                for attempt in range(retry.attempts):
+                last_exception = None
+                for attempt in range(attempts):
                     try:
                         result = func(*args, **kwargs)
-
-                        # Smart return detection - preserve Result types, wrap others, flatten nested Results
-                        if isinstance(result, Result):
-                            return (
-                                result.flatten()
-                            )  # Automatically flatten nested Results
-                        return Ok(result)
-
+                        return (
+                            Ok(result)
+                            if not isinstance(result, Result)
+                            else result.flatten()
+                        )
                     except Exception as e:
-                        if attempt < retry.attempts - 1:
-                            # For sync functions, use configurable backoff
+                        last_exception = e
+
+                        # Check if we should stop retrying
+                        if _should_stop_retrying_sync(e, attempt):
+                            return Err(_format_error(e))
+
+                        # If this is the last attempt, don't sleep
+                        if attempt < attempts - 1:
                             time.sleep(backoff.calculate(attempt))
-                            continue
 
-                        # Final attempt failed
-                        return Err(error_type(str(e)))
-
-                return Err(error_type("Max retries exceeded"))
+                # Return the last exception we caught
+                return Err(_format_error(last_exception))
 
             return sync_wrapper
 
-    return decorator_factory
+    return decorator
+
+
+def compose(*decorators):
+    """Compose decorators beautifully - right to left application."""
+
+    def composed(func):
+        for decorator in reversed(decorators):
+            func = decorator(func)
+        return func
+
+    return composed
 
 
 class Resilient:
-    """Extensible resilience patterns with registry architecture."""
-
-    _registry: Dict[str, Callable] = {}
+    """Beautiful resilience patterns - clean composition."""
 
     def __call__(
         self,
         func=None,
+        *,
         retry=None,
+        timeout=None,
         circuit=None,
         backoff=None,
-        error_type: Optional[type] = None,
+        error_type=None,
         handler=None,
     ):
-        """Enable both @resilient and @resilient(retry=Retry.api()) syntax."""
-        if func is None:
-            # Called as @resilient(retry=Retry.api()) - return decorator factory
-            return decorator(
-                retry=retry,
-                circuit=circuit,
-                backoff=backoff,
+        """@resilient or @resilient() - Main decorator with policy composition."""
+        from .policies import Backoff, Retry
+
+        if func is not None:
+            # Called as @resilient (no parentheses)
+            return self()(func)
+
+        # Called as @resilient() or @resilient(params)
+        retry_policy = retry if retry is not None else Retry()
+        backoff_policy = backoff if backoff is not None else Backoff.exp()
+
+        # Handle timeout from retry policy or direct parameter
+        timeout_seconds = timeout or (retry_policy.timeout if retry else None)
+
+        if timeout_seconds:
+            # Compose timeout + retry
+            return compose(
+                self.timeout(timeout_seconds),
+                globals()["retry"](
+                    attempts=retry_policy.attempts,
+                    backoff=backoff_policy,
+                    error_type=error_type,
+                    handler=handler,
+                ),
+            )
+        else:
+            # Just retry
+            return globals()["retry"](
+                attempts=retry_policy.attempts,
+                backoff=backoff_policy,
                 error_type=error_type,
                 handler=handler,
             )
-        else:
-            # Called as @resilient - apply decorator directly
-            return decorator(
-                retry=retry,
-                circuit=circuit,
-                backoff=backoff,
-                error_type=error_type,
-                handler=handler,
-            )(func)
 
-    # Built-in patterns - all return Result types
-    @classmethod
-    def network(cls, *args, **kwargs):
-        """@resilient.network - Network calls with retry."""
-        from .network import network
+    # Direct pattern access
+    @staticmethod
+    def retry(attempts: int = 3, **kwargs):
+        """@resilient.retry - Pure retry logic."""
+        return retry(attempts, **kwargs)
 
-        return network(*args, **kwargs)
+    @staticmethod
+    def timeout(seconds: float, error_type: type = TimeoutError):
+        """@resilient.timeout - Pure timeout logic."""
+        from .timeout import timeout
 
-    @classmethod
-    def parsing(cls, *args, **kwargs):
-        """@resilient.parsing - JSON parsing with correction."""
-        from .parsing import parsing
+        return timeout(seconds, error_type)
 
-        return parsing(*args, **kwargs)
-
-    @classmethod
-    def circuit(cls, failures: int = 5, window: int = 60, **kwargs):
-        """@resilient.circuit - Circuit breaker that returns Results."""
+    @staticmethod
+    def circuit(failures: int = 3, window: int = 300):
+        """@resilient.circuit - Circuit breaker that returns Result types."""
         from .circuit import circuit
 
-        def result_circuit_decorator(func):
-            # Apply circuit breaker first, then wrap in Result converter
-            circuit_wrapped = circuit(failures=failures, window=window)(func)
-            return decorator(**kwargs)(circuit_wrapped)
+        return circuit(failures, window)
 
-        return result_circuit_decorator
+    @staticmethod
+    def rate_limit(rps: float = 1.0, burst: int = None):
+        """@resilient.rate_limit - Rate limiting with Result wrapper."""
+        import asyncio
+        from functools import wraps
 
-    @classmethod
-    def rate_limit(cls, rps: float = 10.0, burst: int = 1, **kwargs):
-        """@resilient.rate_limit - Rate limiting that returns Results."""
         from .rate_limit import rate_limit
 
-        def result_rate_limit_decorator(func):
-            # Apply rate limiting first, then wrap in Result converter
-            rate_limited = rate_limit(rps=rps, burst=burst)(func)
-            return decorator(**kwargs)(rate_limited)
+        def result_wrapper(func):
+            rate_limit_func = rate_limit(rps, burst)(func)
+            from .result import Ok, Result
 
-        return result_rate_limit_decorator
+            if asyncio.iscoroutinefunction(func):
+
+                @wraps(func)
+                async def async_wrapper(*args, **kwargs):
+                    result = await rate_limit_func(*args, **kwargs)
+                    return Ok(result) if not isinstance(result, Result) else result
+
+                return async_wrapper
+            else:
+
+                @wraps(func)
+                def sync_wrapper(*args, **kwargs):
+                    result = rate_limit_func(*args, **kwargs)
+                    return Ok(result) if not isinstance(result, Result) else result
+
+                return sync_wrapper
+
+        return result_wrapper
+
+    # Composition helpers - common patterns
+    @classmethod
+    def api(cls, attempts: int = 3, timeout_s: float = 30.0):
+        """@resilient.api - Common API pattern: timeout + retry."""
+        return compose(cls.timeout(timeout_s), cls.retry(attempts))
 
     @classmethod
-    def fallback(cls, primary_mode: str, fallback_mode: str, **kwargs):
-        """@resilient.fallback - Fallback between modes on error."""
-
-        async def fallback_handler(error):
-            # Access function args through handler closure
-            if (
-                hasattr(fallback_handler, "_current_args")
-                and len(fallback_handler._current_args) > 0
-                and hasattr(fallback_handler._current_args[0], primary_mode)
-            ):
-                # Switch mode and retry
-                setattr(fallback_handler._current_args[0], primary_mode, fallback_mode)
-                return None  # Retry with modified state
-            return False  # No recovery possible
-
-        def decorator_with_fallback(func):
-            decorated_func = decorator(handler=fallback_handler, **kwargs)(func)
-
-            @wraps(decorated_func)
-            async def wrapper(*args, **func_kwargs):
-                fallback_handler._current_args = args
-                try:
-                    return await decorated_func(*args, **func_kwargs)
-                finally:
-                    if hasattr(fallback_handler, "_current_args"):
-                        delattr(fallback_handler, "_current_args")
-
-            return wrapper
-
-        return decorator_with_fallback
+    def db(cls, attempts: int = 5, timeout_s: float = 60.0):
+        """@resilient.db - Database pattern: timeout + retry."""
+        return compose(cls.timeout(timeout_s), cls.retry(attempts))
 
     @classmethod
-    def register(cls, name: str, decorator_factory: Callable):
-        """Register a domain-specific @resilient pattern."""
-        cls._registry[name] = decorator_factory
-
-    def __getattr__(self, name: str):
-        """Enable @resilient.custom_pattern syntax via dynamic attribute access."""
-        if name in self._registry:
-            return self._registry[name]
-        raise AttributeError(
-            f"'{self.__class__.__name__}' has no pattern '{name}'. Available: {list(self._registry.keys())}"
-        )
+    def protected(cls, attempts: int = 3, failures: int = 5, window: int = 300):
+        """@resilient.protected - Full protection: circuit + retry."""
+        return compose(cls.circuit(failures, window), cls.retry(attempts))
 
 
 # Create instance for beautiful usage

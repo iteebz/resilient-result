@@ -1,50 +1,70 @@
-# resilient-result v0.2.3 API Reference
+# resilient-result v0.3.1 API Reference
 
-## Policy-Based Configuration
+## Core Decorators
 
-### Core Decorator
+### @retry
 ```python
-from resilient_result import resilient, Retry, Circuit, Backoff
+from resilient_result import retry, Backoff
 
-@resilient()                                    # Beautiful defaults
-@resilient(retry=Retry.api())                   # API preset
-@resilient(retry=Retry.db(), backoff=Backoff.linear())  # Combined policies
-@resilient(retry=Retry(attempts=5, timeout=10)) # Custom configuration
+@retry()                                    # 3 attempts, exponential backoff
+@retry(attempts=5)                          # Custom attempts
+@retry(attempts=3, backoff=Backoff.linear()) # Custom backoff
+@retry(attempts=3, error_type=CustomError)  # Custom error type
 ```
 
-### Policy Classes
-
-#### Retry Policy
+### @timeout
 ```python
-# Default constructor
-Retry()          # attempts=3, timeout=None (no timeout)
-Retry(attempts=5, timeout=10)  # Custom values
+from resilient_result import timeout
 
-# Factory methods
-Retry.api()      # attempts=3, timeout=30
-Retry.db()       # attempts=5, timeout=60  
-Retry.ml()       # attempts=2, timeout=120
+@timeout(10.0)                              # 10 second timeout
+@timeout(30.0, error_type=MyTimeoutError)   # Custom error type
 ```
 
-#### Backoff Policy
+### @circuit
 ```python
-# Factory methods
-Backoff.exp()     # delay=0.1, factor=2, max_delay=30
-Backoff.linear()  # delay=1.0
-Backoff.fixed()   # delay=1.0
+from resilient_result import circuit
 
-# Custom
-Backoff.exp(delay=0.5, factor=1.5, max_delay=60)
+@circuit()                                  # 3 failures, 300s window
+@circuit(failures=5, window=60)            # Custom configuration
 ```
 
-#### Circuit Policy
+### @rate_limit
 ```python
-# Factory methods
-Circuit.fast()     # failures=3, window=60
-Circuit.standard() # failures=5, window=300
+from resilient_result import rate_limit
 
-# Custom
-Circuit(failures=3, window=60)
+@rate_limit()                               # 1 RPS default
+@rate_limit(rps=10.0, burst=5)             # Custom rate and burst
+```
+
+## Composition
+
+### Manual Composition
+```python
+from resilient_result import compose, retry, timeout, circuit
+
+@compose(
+    circuit(failures=3),
+    timeout(10.0),
+    retry(attempts=3)
+)
+async def robust_operation():
+    return await external_service()
+```
+
+### Resilient Class Patterns
+```python
+from resilient_result import resilient
+
+# Pre-built patterns
+@resilient.api()          # timeout(30) + retry(3)
+@resilient.db()           # timeout(60) + retry(5)  
+@resilient.protected()    # circuit + retry
+
+# Individual decorators
+@resilient.retry(attempts=5)
+@resilient.timeout(10.0)
+@resilient.circuit(failures=3)
+@resilient.rate_limit(rps=100)
 ```
 
 ## Result Types
@@ -55,7 +75,7 @@ from resilient_result import Result, Ok, Err, unwrap
 
 # Construction
 success = Ok("data")
-failure = Err("error")
+failure = Err("error message")
 
 # Pattern matching
 if result.success:
@@ -63,89 +83,160 @@ if result.success:
 else:
     print(result.error)
 
-# Extraction
-data = unwrap(result)  # Raises if error
+# Boolean context
+if result:
+    print("Success!")
+
+# Extraction (raises on error)
+data = unwrap(result)
+data = result.unwrap()
 ```
 
-### Parallel Operations
+### Advanced Result Operations
+
+#### Flattening
+```python
+nested = Ok(Ok("data"))
+flat = nested.flatten()  # Ok("data")
+
+mixed = Ok(Err("error"))
+flat = mixed.flatten()   # Err("error")
+```
+
+#### Parallel Collection
 ```python
 # Collect multiple async operations
-operations = [fetch_user(id), fetch_profile(id)]
+operations = [fetch_user(1), fetch_user(2), fetch_user(3)]
 result = await Result.collect(operations)
 
 if result.success:
-    user, profile = result.data  # All succeeded
+    users = result.data  # List of all results
 else:
-    print(f"Failed: {result.error}")  # First failure
+    print(f"First failure: {result.error}")
 ```
 
-## Built-in Patterns
+## Policy Objects
 
-### Network Pattern
+### Retry Policies
 ```python
-@resilient.network()
-async def api_call():
-    return await httpx.get(url)
+from resilient_result import Retry
+
+Retry()                   # attempts=3, timeout=None
+Retry(attempts=5, timeout=30.0)
+
+# Presets
+Retry.api()              # attempts=3, timeout=30
+Retry.db()               # attempts=5, timeout=60
+Retry.ml()               # attempts=2, timeout=120
 ```
 
-### Parsing Pattern  
+### Backoff Strategies
 ```python
-@resilient.parsing()
-async def parse_json(text):
-    return json.loads(text)
+from resilient_result import Backoff
+
+# Exponential (default)
+Backoff.exp()                           # delay=0.1, factor=2, max=30
+Backoff.exp(delay=0.5, factor=1.5)     # Custom parameters
+
+# Linear
+Backoff.linear()                        # delay=1.0
+Backoff.linear(delay=2.0, max_delay=60)
+
+# Fixed
+Backoff.fixed()                         # delay=1.0
+Backoff.fixed(delay=5.0)
 ```
 
-### Circuit Breaker
+### Circuit Policies
 ```python
-@resilient.circuit(failures=3, window=60)
-async def external_service():
-    return await service.call()
+from resilient_result import Circuit
+
+Circuit()                # failures=5, window=300
+Circuit(failures=3, window=60)
+
+# Presets
+Circuit.fast()           # failures=3, window=60
+Circuit.standard()       # failures=5, window=300
 ```
 
-### Rate Limiting
+### Timeout Policies
 ```python
-@resilient.rate_limit(rps=10.0, burst=5)
-async def api_call():
-    return await external_api()
+from resilient_result import Timeout
+
+Timeout(30.0)
+
+# Presets
+Timeout.fast()           # 5 seconds
+Timeout.api()            # 30 seconds
+Timeout.db()             # 60 seconds
+Timeout.ml()             # 120 seconds
 ```
 
-## Advanced Features
+## Error Handling
 
 ### Custom Error Types
 ```python
-@resilient(retry=Retry.api(), error_type=CustomError)
-async def typed_operation():
-    return "data"
-# Returns Result[str, CustomError]
+class APIError(Exception):
+    pass
+
+@retry(attempts=3, error_type=APIError)
+async def api_call():
+    raise ValueError("Connection failed")
+
+# Returns Err(APIError("Connection failed"))
 ```
 
-### Custom Handlers
+### Error Handlers
 ```python
 async def smart_handler(error):
     if "rate_limit" in str(error):
         await asyncio.sleep(60)
-        return None  # Retry
-    return False  # Don't retry
+        return None  # Continue retrying
+    return False     # Stop retrying
 
-@resilient(retry=Retry(attempts=3), handler=smart_handler)
-async def operation():
-    return await api_call()
+@retry(attempts=5, handler=smart_handler)
+async def api_with_rate_limits():
+    return await external_api()
 ```
 
-### Registry System
+## Complete Examples
+
+### API Client
 ```python
-# Register custom patterns
-resilient.register("custom", lambda **kwargs: decorator(**kwargs))
+from resilient_result import resilient, Result
 
-# Use registered patterns
-@resilient.custom()
-async def operation():
-    return "data"
+@resilient.api(attempts=3, timeout_s=30.0)
+async def fetch_user(user_id: str) -> str:
+    response = await httpx.get(f"/users/{user_id}")
+    return response.json()
+
+result: Result[dict, Exception] = await fetch_user("123")
+if result:
+    user = result.data
+    print(f"User: {user['name']}")
+else:
+    print(f"Failed: {result.error}")
 ```
 
-## Key Principles
+### Database Operations
+```python
+@resilient.db(attempts=5, timeout_s=60.0)
+async def save_user(user_data: dict) -> str:
+    async with database.transaction():
+        return await User.create(**user_data)
 
-- **Policy objects over primitives**: `retry=Retry.api()` not `retries=3`
-- **Beautiful factory methods**: Short, memorable presets
-- **Result types over exceptions**: Explicit error handling
-- **Zero ceremony**: Clean, readable decorators
+result = await save_user({"name": "Alice"})
+if result:
+    print(f"Created user ID: {result.data}")
+```
+
+### Protected Service
+```python
+@resilient.protected(attempts=3, failures=5, window=300)
+async def critical_service():
+    return await external_dependency()
+
+# Combines circuit breaker + retry for maximum protection
+```
+
+All decorators return `Result[T, Exception]` types - never throw exceptions directly.

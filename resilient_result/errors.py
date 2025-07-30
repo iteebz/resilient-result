@@ -1,19 +1,19 @@
-"""Standard error types for resilient operations."""
+"""Mechanism-focused error types for resilience patterns."""
 
 
-class NetworkError(Exception):
-    """Network operation errors."""
-
-    pass
-
-
-class ParsingError(Exception):
-    """Parsing and data transformation errors."""
+class CircuitError(Exception):
+    """Circuit breaker is open."""
 
     pass
 
 
-class TimeoutError(Exception):
-    """Operation timeout errors."""
+class RateLimitError(Exception):
+    """Rate limit exceeded."""
+
+    pass
+
+
+class RetryError(Exception):
+    """Max retry attempts exhausted."""
 
     pass

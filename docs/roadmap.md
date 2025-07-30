@@ -1,155 +1,112 @@
 # Resilient-Result Roadmap
 
-## v0.2.0 - Foundation Architecture ✅
+## v0.3.1 - Current Release ✅
 
-**Status**: Ready for release
-**Focus**: Proven extensible architecture with foundational patterns
+**Status**: Production Ready
+**Focus**: Pure mechanisms with beautiful Result types
 
-### Core Features
-- ✅ Registry-based extension system
-- ✅ Beautiful decorator API (`@resilient.pattern()`)
-- ✅ Result[T, E] type system with Ok/Err variants
-- ✅ Auto-discovery pattern registration
-- ✅ Domain-specific extension (proven with Cogency integration)
+### Features Shipped
+- ✅ Orthogonal decorator composition (`@retry`, `@timeout`, `@circuit`, `@rate_limit`)
+- ✅ Result[T, E] type system with Ok/Err constructors
+- ✅ Automatic Result flattening for clean boundary discipline
+- ✅ Parallel operation collection (`Result.collect()`)
+- ✅ Policy objects (Retry, Backoff, Circuit, Timeout)
+- ✅ Resilient class with pre-built patterns (`@resilient.api()`, `@resilient.db()`)
+- ✅ Function composition via `compose()` decorator
+- ✅ Custom error types and smart error handlers
+- ✅ Token bucket rate limiting with burst support
+- ✅ Circuit breaker with failure counting and time windows
 
-### Foundational Patterns
-- ✅ Basic retry with exponential backoff
-- ✅ Circuit breaker (naive implementation)
-- ✅ Token bucket rate limiting
-- ✅ Network error handling
-- ✅ JSON parsing with correction
-
-**Note**: Current patterns are "good enough" implementations suitable for development and basic production use. Production-grade enhancements planned for v0.3.0.
+### Architecture Achievements
+- **Zero Ceremony**: `@retry()` just works with smart defaults
+- **Orthogonal Design**: Each decorator handles one concern, composes cleanly
+- **Type Safety**: All operations return `Result[T, Exception]` - no thrown exceptions
+- **Performance**: Minimal overhead, async-first design
+- **Extensibility**: Clean patterns for domain-specific decorators
 
 ---
 
-## v0.3.0 - Production-Grade Patterns 🎯
+## v0.4.0 - Production Enhancements 🎯
 
-**Focus**: Enterprise-ready resilience implementations
+**Target**: Q2 2025
+**Focus**: Enterprise-grade reliability improvements
 
-### Critical Production Gaps to Address
+### Planned Enhancements
 
-#### 1. Circuit Breaker Enhancements
-**Current Issues**:
-- ❌ No half-open state for recovery testing
-- ❌ No exponential backoff for recovery attempts
-- ❌ No metrics/observability hooks
+#### Circuit Breaker Evolution
+- **Half-open state** for graceful recovery testing
+- **Exponential backoff** for circuit recovery attempts
+- **Health check integration** for dependency awareness
 
-**v0.3.0 Goals**:
-- ✅ Half-open state with configurable recovery testing
-- ✅ Exponential backoff with jitter for recovery
-- ✅ Metrics collection (failure rates, state transitions)
-- ✅ Health check integration
+#### Rate Limiting Improvements  
+- **Distributed rate limiting** with Redis backend
+- **Sliding window algorithms** for smoother rate control
+- **HTTP rate limit headers** (`X-RateLimit-*` compliance)
 
-#### 2. Rate Limiting Improvements
-**Current Issues**:
-- ❌ No distributed rate limiting (Redis-backed)
-- ❌ No sliding window algorithm options
-- ❌ No rate limit headers for HTTP APIs
-- ❌ No burst debt tracking
+#### Observability Integration
+- **OpenTelemetry spans** for all resilience operations
+- **Prometheus metrics** for failure rates and latencies
+- **Structured logging** with correlation IDs
 
-**v0.3.0 Goals**:
-- ✅ Redis-backed distributed rate limiting
-- ✅ Multiple algorithms (token bucket, sliding window, fixed window)
-- ✅ HTTP rate limit headers (`X-RateLimit-*`)
-- ✅ Burst debt and quota management
-- ✅ Rate limit warming strategies
-
-#### 3. Network Resilience Upgrade
-**Current Issues**:
-- ❌ String parsing for error detection (fragile)
-- ❌ No exponential backoff with jitter
-- ❌ No connection pooling awareness
-- ❌ No DNS resolution retries
-
-**v0.3.0 Goals**:
-- ✅ Proper exception type classification
-- ✅ Exponential backoff with configurable jitter
-- ✅ Connection pool integration patterns
-- ✅ DNS-aware retry strategies
-- ✅ Request/response middleware hooks
-
-#### 4. Core Decorator Enterprise Features
-**Current Issues**:
-- ❌ No observability/tracing integration
-- ❌ Fixed exponential backoff (no jitter)
-- ❌ No bulkhead isolation patterns
-- ❌ No graceful degradation strategies
-
-**v0.3.0 Goals**:
-- ✅ OpenTelemetry tracing integration
-- ✅ Prometheus metrics collection
-- ✅ Jitter for backoff strategies
-- ✅ Bulkhead pattern implementation
-- ✅ Graceful degradation with fallback chains
-
-### New Production Patterns
-
-#### 5. Bulkhead Isolation
+#### Advanced Patterns
 ```python
+# Bulkhead isolation
 @resilient.bulkhead(max_concurrent=10, queue_size=100)
-async def external_api_call():
-    pass
+async def protected_operation(): ...
+
+# Fallback chains
+@resilient.fallback([primary_service, cache_fallback])
+async def resilient_fetch(): ...
+
+# Multi-level timeouts
+@resilient.timeout(operation=5.0, request=30.0, total=300.0)
+async def complex_operation(): ...
 ```
 
-#### 6. Timeout Hierarchies  
-```python
-@resilient.timeout(operation=5.0, request=30.0, circuit=300.0)
-async def complex_operation():
-    pass
-```
-
-#### 7. Fallback Chains
-```python
-@resilient.fallback([primary_service, secondary_service, cache_fallback])
-async def get_data():
-    pass
-```
-
-#### 8. Health Check Integration
-```python
-@resilient.health_aware(check_interval=30)
-async def dependent_service():
-    pass
-```
+### Quality Improvements
+- **Jitter for backoff strategies** to prevent thundering herd
+- **Connection pool awareness** for network operations
+- **Graceful degradation** patterns with automatic fallbacks
 
 ---
 
-## v0.4.0 - Observability & Operations 📊
+## v0.5.0 - Ecosystem & Extensions 🌐
 
-### Planned Features
-- Full OpenTelemetry integration
-- Prometheus metrics dashboard
-- Configuration hot-reloading
-- A/B testing for resilience strategies
-- Cost-aware retry policies
-- Multi-region failover patterns
+**Target**: Q4 2025
+**Focus**: Community patterns and integrations
+
+### Extension Ecosystem
+- **Database resilience patterns** (connection pooling, transaction retries)
+- **ML inference patterns** (model fallbacks, batch processing)
+- **Cloud provider integrations** (AWS, GCP, Azure specific patterns)
+- **Message queue patterns** (dead letter handling, poison message detection)
+
+### Developer Experience
+- **Configuration hot-reloading** for runtime policy adjustments
+- **A/B testing framework** for resilience strategies
+- **Cost-aware policies** that balance reliability vs. resource usage
+- **Visual debugger** for understanding decorator composition
 
 ---
 
-## Architecture Principles
+## Long-term Vision
 
-### Maintained Across All Versions
-1. **Zero Ceremony**: Beautiful decorator API with sensible defaults
-2. **Type Safety**: Result[T, E] contract preserved
-3. **Extensibility**: Registry system enables domain-specific patterns
-4. **Composability**: Decorators stack cleanly
-5. **Performance**: Minimal overhead, async-first design
+### Core Principles (Never Change)
+1. **Pure Mechanisms**: No domain-specific assumptions, just clean primitives
+2. **Result Types**: Explicit error handling, no hidden exceptions
+3. **Orthogonal Composition**: Decorators stack predictably
+4. **Zero Ceremony**: Beautiful APIs with smart defaults
+5. **Type Safety**: Full generic type support with proper inference
 
 ### Breaking Changes Policy
-- v0.x.0: Minor breaking changes allowed with migration guide
-- v1.0.0+: Semantic versioning with backwards compatibility
+- **v0.x**: Minor breaking changes allowed with clear migration guide
+- **v1.0+**: Semantic versioning with strict backwards compatibility
+- **Extensions**: Separate packages for domain-specific patterns
 
----
+### Success Metrics
+- **Adoption**: 10k+ downloads/month by v1.0
+- **Extensions**: 5+ community-maintained domain packages
+- **Enterprise**: Production usage at 100+ companies
+- **Reliability**: <0.1% failure rate in decorator composition
 
-## Community & Ecosystem
-
-### Extension Points
-- Custom error handlers
-- Domain-specific patterns (AI, data, API, etc.)
-- Observability integrations  
-- Cloud provider integrations
-
-### Proven Extensions
-- **Cogency**: AI agent resilience patterns
-- **Future**: Database, queue, cache, ML inference patterns
+The roadmap prioritizes **reliability over features** - every addition must maintain the zero-ceremony, type-safe foundation that makes resilient-result beautiful.

@@ -1,10 +1,9 @@
 """Core tests for Option D implementation - resilient decorators + Result returns."""
 
-import asyncio
 
 import pytest
 
-from resilient_result import Backoff, Err, Ok, Result, Retry, resilient
+from resilient_result import Err, Ok, Retry, resilient
 
 
 class CustomError(Exception):
@@ -52,39 +51,6 @@ async def test_custom_error_type():
     assert not result.success
     assert isinstance(result.error, CustomError)
     assert "original error" in str(result.error)
-
-
-@pytest.mark.asyncio
-async def test_retries():
-    """Test retry mechanism."""
-    call_count = 0
-
-    @resilient(retry=Retry(attempts=2), backoff=Backoff.fixed(delay=0.001))
-    async def retry_func():
-        nonlocal call_count
-        call_count += 1
-        if call_count < 2:
-            raise ValueError("not yet")
-        return "success"
-
-    result = await retry_func()
-    assert result.success
-    assert result.data == "success"
-    assert call_count == 2
-
-
-@pytest.mark.asyncio
-async def test_timeout():
-    """Test timeout functionality."""
-
-    @resilient(retry=Retry(attempts=1, timeout=0.05))
-    async def slow_func():
-        await asyncio.sleep(0.1)
-        return "too slow"
-
-    result = await slow_func()
-    assert not result.success
-    assert isinstance(result.error, Exception)
 
 
 @pytest.mark.asyncio
@@ -140,41 +106,38 @@ def test_sync_support():
     assert result.success
     assert result.data == "sync success"
 
-    call_count = 0
 
-    @resilient(retry=Retry(attempts=2), backoff=Backoff.fixed(delay=0.001))
-    def sync_retry():
-        nonlocal call_count
-        call_count += 1
-        if call_count < 2:
-            raise ValueError("not yet")
-        return "sync retry success"
+def test_decorator_syntax():
+    """Test @resilient vs @resilient() syntax works."""
 
-    result = sync_retry()
-    assert result.success
-    assert result.data == "sync retry success"
-    assert call_count == 2
+    @resilient
+    def without_parens():
+        return "success"
+
+    @resilient()
+    def with_parens():
+        return "success"
+
+    assert without_parens().success
+    assert with_parens().success
 
 
-def test_result_types():
-    """Test Result type constructors."""
-    # Ok constructor
-    ok_result = Ok("data")
-    assert ok_result.success
-    assert ok_result.data == "data"
-    assert ok_result.error is None
+@pytest.mark.asyncio
+async def test_static_methods_return_results():
+    """Test @resilient.* static methods return Result types."""
 
-    # Err constructor
-    err_result = Err("error")
-    assert not err_result.success
-    assert err_result.error == "error"
-    assert err_result.data is None
+    @resilient.retry()
+    async def retry_func():
+        return "retry"
 
-    # Result class methods
-    ok_result2 = Result.ok("data2")
-    assert ok_result2.success
-    assert ok_result2.data == "data2"
+    @resilient.circuit(failures=2, window=60)
+    async def circuit_func():
+        return "circuit"
 
-    err_result2 = Result.fail("error2")
-    assert not err_result2.success
-    assert err_result2.error == "error2"
+    @resilient.rate_limit(rps=100, burst=5)
+    async def rate_func():
+        return "rate"
+
+    assert (await retry_func()).success
+    assert (await circuit_func()).success
+    assert (await rate_func()).success

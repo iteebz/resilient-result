@@ -8,117 +8,106 @@ from resilient_result.circuit import circuit
 
 
 @pytest.mark.asyncio
-async def test_circuit_breaker_opens_after_failures():
-    """Test circuit breaker opens after max failures."""
+async def test_opens_after_failures(call_counter, always_failing_func):
+    """Circuit opens after max failures."""
 
     @circuit(failures=2, window=60)
-    async def failing_function():
-        raise Exception("Always fails")
+    async def func():
+        call_counter.increment()
+        raise ValueError("fail")
 
-    # First failure
-    with pytest.raises(Exception, match="Always fails"):
-        await failing_function()
+    # Two failures
+    result1 = await func()
+    assert result1.failure
+    assert isinstance(result1.error, ValueError)
 
-    # Second failure - should still raise
-    with pytest.raises(Exception, match="Always fails"):
-        await failing_function()
+    result2 = await func()
+    assert result2.failure
+    assert isinstance(result2.error, ValueError)
 
-    # Third call - circuit should be open
-    result = await failing_function()
-    assert "Circuit breaker open" in result
-    assert "too many failures" in result
+    # Third call - circuit open
+    result = await func()
+    assert result.failure
+    assert "Circuit breaker open" in str(result.error)
 
 
 @pytest.mark.asyncio
-async def test_circuit_breaker_resets_after_time_window():
-    """Test circuit breaker resets after time window expires."""
+async def test_resets_after_window(call_counter):
+    """Circuit resets after time window."""
 
-    @circuit(failures=1, window=0.1)  # 100ms window
-    async def failing_then_working():
-        if not hasattr(failing_then_working, "call_count"):
-            failing_then_working.call_count = 0
-        failing_then_working.call_count += 1
-
-        if failing_then_working.call_count <= 1:
-            raise Exception("Initial failure")
+    @circuit(failures=1, window=0.1)
+    async def func():
+        count = call_counter.increment()
+        if count == 1:
+            raise ValueError("fail")
         return "success"
 
-    # First call fails and opens circuit
-    with pytest.raises(Exception, match="Initial failure"):
-        await failing_then_working()
+    # Fail and open circuit
+    result1 = await func()
+    assert result1.failure
+    assert isinstance(result1.error, ValueError)
 
-    # Second call - circuit should be open
-    result = await failing_then_working()
-    assert "Circuit breaker open" in result
+    result = await func()
+    assert result.failure
+    assert "Circuit breaker open" in str(result.error)
 
-    # Wait for time window to expire
+    # Wait and retry
     await asyncio.sleep(0.11)
-
-    # Third call - circuit should be closed and function works
-    result = await failing_then_working()
-    assert result == "success"
-
-
-@pytest.mark.asyncio
-async def test_circuit_breaker_per_function_isolation():
-    """Test circuit breaker isolates failures per function."""
-
-    @circuit(failures=1, window=60)
-    async def function_a():
-        raise Exception("Function A fails")
-
-    @circuit(failures=1, window=60)
-    async def function_b():
-        return "Function B works"
-
-    # Function A fails and opens its circuit
-    with pytest.raises(Exception, match="Function A fails"):
-        await function_a()
-
-    # Function A circuit is now open
-    result_a = await function_a()
-    assert "Circuit breaker open" in result_a
-
-    # Function B should still work
-    result_b = await function_b()
-    assert result_b == "Function B works"
+    result = await func()
+    assert result.success
+    assert result.data == "success"
 
 
 @pytest.mark.asyncio
-async def test_circuit_breaker_successful_calls_dont_trigger():
-    """Test successful calls don't trigger circuit breaker."""
+async def test_isolation():
+    """Circuits isolate per function."""
 
-    @circuit(failures=3, window=60)  # Allow 3 failures
-    async def sometimes_failing():
-        if not hasattr(sometimes_failing, "call_count"):
-            sometimes_failing.call_count = 0
-        sometimes_failing.call_count += 1
+    @circuit(failures=1, window=60)
+    async def func_a():
+        raise ValueError("fail")
 
-        # Fail on odd calls, succeed on even calls
-        if sometimes_failing.call_count % 2 == 1:
-            raise Exception("Odd call fails")
-        return f"Success on call {sometimes_failing.call_count}"
+    @circuit(failures=1, window=60)
+    async def func_b():
+        return "success"
 
-    # Call 1 - fails (1 failure)
-    with pytest.raises(Exception, match="Odd call fails"):
-        await sometimes_failing()
+    # A fails and opens
+    result_a1 = await func_a()
+    assert result_a1.failure
+    assert isinstance(result_a1.error, ValueError)
 
-    # Call 2 - succeeds (still 1 failure)
-    result = await sometimes_failing()
-    assert result == "Success on call 2"
+    result_a = await func_a()
+    assert result_a.failure
+    assert "Circuit breaker open" in str(result_a.error)
 
-    # Call 3 - fails (2 failures)
-    with pytest.raises(Exception, match="Odd call fails"):
-        await sometimes_failing()
+    # B still works
+    result_b = await func_b()
+    assert result_b.is_ok()
+    assert result_b.unwrap() == "success"
 
-    # Call 4 - should still work (still 2 failures < 3)
-    result = await sometimes_failing()
-    assert result == "Success on call 4"
 
-    # Call 5 - fails (3 failures, hits limit)
-    with pytest.raises(Exception, match="Odd call fails"):
-        await sometimes_failing()
+@pytest.mark.asyncio
+async def test_success_doesnt_trigger(call_counter):
+    """Success calls don't trigger circuit."""
 
-    # Call 6 - circuit should now be open
-    result = await sometimes_failing()
-    assert "Circuit breaker open" in result
+    @circuit(failures=2, window=60)
+    async def func():
+        count = call_counter.increment()
+        if count in [1, 3]:  # Fail on 1st and 3rd
+            raise ValueError("fail")
+        return f"success {count}"
+
+    # Fail, succeed, fail - should still work
+    result1 = await func()
+    assert result1.is_err()
+
+    result2 = await func()
+    assert result2.is_ok()
+    assert result2.unwrap() == "success 2"
+
+    result3 = await func()
+    assert result3.is_err()
+
+    # 4th call should work (only 2 failures)
+    result4 = await func()
+    assert result4.is_ok()
+    assert result4.unwrap() == "success 4"

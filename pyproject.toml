@@ -1,6 +1,10 @@
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
 [tool.poetry]
 name = "resilient-result"
-version = "0.3.0"
+version = "0.3.1"
 description = "Resilient decorators that return Result types instead of throwing exceptions"
 authors = ["resilient-result contributors"]
 license = "MIT"
@@ -33,10 +37,6 @@ pytest-asyncio = "^0.21.0"
 pytest-cov = "^4.0.0"
 black = "^23.0.0"
 ruff = "^0.1.0"
-
-[build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -1,29 +1,27 @@
 """Policy objects for configurable resilience strategies."""
 
-from typing import Optional
-
 
 class Retry:
-    """Retry policy with timeout - beautiful, short, powerful."""
+    """Pure retry policy - orthogonal, composable, beautiful."""
 
-    def __init__(self, attempts: int = 3, timeout: Optional[float] = None):
+    def __init__(self, attempts: int = 3, timeout: float = None):
         """Create retry policy. Default: 3 attempts, no timeout."""
         self.attempts = attempts
         self.timeout = timeout
 
     @classmethod
     def api(cls, attempts: int = 3, timeout: float = 30.0):
-        """API calls - moderate retries, reasonable timeout."""
+        """API calls - moderate retries."""
         return cls(attempts=attempts, timeout=timeout)
 
     @classmethod
     def db(cls, attempts: int = 5, timeout: float = 60.0):
-        """Database operations - more retries, longer timeout."""
+        """Database operations - more retries."""
         return cls(attempts=attempts, timeout=timeout)
 
     @classmethod
     def ml(cls, attempts: int = 2, timeout: float = 120.0):
-        """ML inference - fewer retries, long timeout."""
+        """ML inference - fewer retries."""
         return cls(attempts=attempts, timeout=timeout)
 
 
@@ -87,3 +85,30 @@ class Backoff:
     def fixed(cls, delay: float = 1.0):
         """Fixed delay - simple constant."""
         return cls(strategy="fixed", delay=delay)
+
+
+class Timeout:
+    """Timeout policy for time-based protection."""
+
+    def __init__(self, seconds: float):
+        self.seconds = seconds
+
+    @classmethod
+    def fast(cls, seconds: float = 5.0):
+        """Fast timeout - quick operations."""
+        return cls(seconds)
+
+    @classmethod
+    def api(cls, seconds: float = 30.0):
+        """API timeout - standard web requests."""
+        return cls(seconds)
+
+    @classmethod
+    def db(cls, seconds: float = 60.0):
+        """Database timeout - longer operations."""
+        return cls(seconds)
+
+    @classmethod
+    def ml(cls, seconds: float = 120.0):
+        """ML timeout - inference operations."""
+        return cls(seconds)

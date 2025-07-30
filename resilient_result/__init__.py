@@ -1,15 +1,14 @@
 """Resilient Result - Result pattern with resilience decorators for clean error handling."""
 
 from .circuit import circuit
-from .errors import NetworkError, ParsingError, TimeoutError
-from .network import network
-from .parsing import parsing
-from .policies import Backoff, Circuit, Retry
+from .errors import CircuitError, RateLimitError, RetryError
+from .policies import Backoff, Circuit, Retry, Timeout
 from .rate_limit import rate_limit
-from .resilient import Resilient, resilient
+from .resilient import Resilient, compose, resilient, retry
 from .result import Err, Ok, Result, unwrap
+from .timeout import timeout
 
-__version__ = "0.3.0"
+__version__ = "0.3.1"
 __all__ = [
     "Result",
     "Ok",
@@ -17,14 +16,16 @@ __all__ = [
     "unwrap",
     "resilient",
     "Resilient",
+    "retry",
+    "compose",
+    "timeout",
+    "circuit",
+    "rate_limit",
     "Retry",
     "Circuit",
     "Backoff",
-    "network",
-    "parsing",
-    "circuit",
-    "rate_limit",
-    "NetworkError",
-    "ParsingError",
-    "TimeoutError",
+    "Timeout",
+    "CircuitError",
+    "RateLimitError",
+    "RetryError",
 ]

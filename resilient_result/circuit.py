@@ -1,5 +1,6 @@
 """Circuit breaker for runaway protection."""
 
+import asyncio
 import time
 from collections import defaultdict
 from functools import wraps
@@ -26,30 +27,70 @@ class CircuitBreaker:
         """Record a failure for this function."""
         self._failures[func_name].append(time.time())
 
+    def record_success(self, func_name: str) -> None:
+        """Record a success and reset failures."""
+        self._failures[func_name] = []
+
 
 # Global instance
 circuit_breaker = CircuitBreaker()
 
 
 def circuit(failures: int = 3, window: int = 300):
-    """Circuit breaker for runaway protection."""
+    """Circuit breaker decorator - returns Result types for consistent interface.
+
+    On success: returns Ok(result)
+    On failure: records failure and returns Err(exception)
+    Circuit open: returns Err(CircuitError)
+
+    This maintains the Result interface while providing circuit breaker functionality.
+    """
 
     def decorator(func):
         func_name = f"{func.__module__}.{func.__qualname__}"
+        is_async = asyncio.iscoroutinefunction(func)
 
-        @wraps(func)
-        async def circuit_protected(*args, **kwargs):
-            # Check if circuit is open
-            if circuit_breaker.is_open(func_name, failures, window):
-                return f"Circuit breaker open for {func_name} - too many failures"
+        if is_async:
 
-            try:
-                return await func(*args, **kwargs)
-            except Exception:
-                # Record failure and re-raise
-                circuit_breaker.record_failure(func_name)
-                raise
+            @wraps(func)
+            async def async_circuit_protected(*args, **kwargs):
+                from .result import Err, Ok, Result
 
-        return circuit_protected
+                # Check if circuit is open
+                if circuit_breaker.is_open(func_name, failures, window):
+                    from .errors import CircuitError
+
+                    return Err(CircuitError("Circuit breaker open"))
+
+                try:
+                    result = await func(*args, **kwargs)
+                    circuit_breaker.record_success(func_name)
+                    return Ok(result) if not isinstance(result, Result) else result
+                except Exception as e:
+                    circuit_breaker.record_failure(func_name)
+                    return Err(e)
+
+            return async_circuit_protected
+        else:
+
+            @wraps(func)
+            def sync_circuit_protected(*args, **kwargs):
+                from .result import Err, Ok, Result
+
+                # Check if circuit is open
+                if circuit_breaker.is_open(func_name, failures, window):
+                    from .errors import CircuitError
+
+                    return Err(CircuitError("Circuit breaker open"))
+
+                try:
+                    result = func(*args, **kwargs)
+                    circuit_breaker.record_success(func_name)
+                    return Ok(result) if not isinstance(result, Result) else result
+                except Exception as e:
+                    circuit_breaker.record_failure(func_name)
+                    return Err(e)
+
+            return sync_circuit_protected
 
     return decorator

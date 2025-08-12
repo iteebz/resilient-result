@@ -63,9 +63,9 @@ class Backoff:
         if self.strategy == "exponential":
             delay = self.delay * (self.factor**attempt)
             return min(delay, self.max_delay)
-        elif self.strategy == "linear":
+        if self.strategy == "linear":
             return min(self.delay * (attempt + 1), self.max_delay)
-        elif self.strategy == "fixed":
+        if self.strategy == "fixed":
             return self.delay
         return self.delay
 

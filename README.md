@@ -4,7 +4,7 @@
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-**Pure resilience mechanisms with beautiful Result types.**
+**Resilience mechanisms with Result types.**
 
 ```python
 from resilient_result import retry, timeout, Result
@@ -16,14 +16,15 @@ async def call_api(url: str) -> str:
 
 result: Result[str, Exception] = await call_api("https://api.example.com")
 if result.success:
-    print(result.data)  # Clean success
+    data = result.unwrap()  # Extract data safely
+    print(data)
 else:
-    print(f"Failed: {result.error}")  # No exceptions thrown
+    print(f"Failed: {result.error}")  # Inspect error directly
 ```
 
 **Why resilient-result?** Pure mechanisms over domain patterns, Result types over exceptions, orthogonal composition.
 
-**📖 [Full API Reference](docs/api.md)**
+**📖 [Result API](docs/result.md) | 🔧 [Resilience Patterns](docs/resilient.md)**
 
 ## Installation
 
@@ -46,16 +47,30 @@ async def critical_operation():
     return await external_service()
 ```
 
-### Result Types Over Exceptions
+### Result Usage
 ```python
 from resilient_result import Result, Ok, Err
 
-# Clean error handling - no try/catch needed
+# Pattern 1: Check then unwrap
 result = await call_api("https://api.example.com")
 if result.success:
-    process(result.data)
-else:
+    data = result.unwrap()
+    process(data)
+
+# Pattern 2: Error inspection for conditional logic
+result = await call_api("https://api.example.com")
+if result.failure and "rate_limit" in result.error:
+    await asyncio.sleep(60)  # Backoff on rate limit
+    retry()
+elif result.failure:
     log_error(result.error)
+
+# Pattern 3: Direct unwrap (raises exception on failure)
+try:
+    data = result.unwrap()
+    process(data)
+except ApiError as e:
+    log_error(e)
 ```
 
 ### Advanced Composition
@@ -86,24 +101,45 @@ operations = [fetch_user(1), fetch_user(2), fetch_user(3)]
 result = await Result.collect(operations)
 
 if result.success:
-    users = result.data  # All succeeded
+    users = result.unwrap()  # All succeeded
 else:
-    print(f"First failure: {result.error}")
+    try:
+        result.unwrap()  # Raises first failure
+    except Exception as e:
+        print(f"First failure: {e}")
 ```
 
-### Custom Error Handling
+### Error Inspection Patterns
 ```python
-async def smart_handler(error):
-    if "rate_limit" in str(error):
-        await asyncio.sleep(60)
-        return None  # Continue retrying
-    return False     # Stop retrying
+# Canonical API: 3 ways to work with Results
+result = await call_api("https://api.example.com")
 
-@retry(attempts=5, handler=smart_handler)
-async def api_with_intelligent_backoff():
-    return await rate_limited_api()
+# 1. Status checking
+if result.success:
+    print("Success!")
+if result.failure:
+    print("Failed!")
+
+# 2. Error inspection (without exceptions)
+if result.failure:
+    error_msg = result.error
+    if "network" in str(error_msg):
+        retry_with_backoff()
+    elif "auth" in str(error_msg):
+        refresh_token()
+
+# 3. Value extraction (raises on failure)
+try:
+    data = result.unwrap()  
+    process(data)
+except Exception as e:
+    handle_error(e)
 ```
 
 ## License
 
 MIT - Build amazing resilient systems! 🚀
+
+---
+
+**🗺️ [Roadmap](docs/dev/roadmap.md)**

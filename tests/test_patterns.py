@@ -29,7 +29,7 @@ async def test_composition_patterns():
 
     result = await complex_operation()
     assert result.success
-    assert result.data == "composed success"
+    assert result.unwrap() == "composed success"
 
 
 @pytest.mark.asyncio
@@ -42,7 +42,7 @@ async def test_resilient_presets():
 
     result = await api_call()
     assert result.success
-    assert result.data == "api success"
+    assert result.unwrap() == "api success"
 
 
 @pytest.mark.asyncio
@@ -55,4 +55,4 @@ async def test_policy_based_retry():
 
     result = await db_operation()
     assert result.success
-    assert result.data == {"data": "from_database"}
+    assert result.unwrap() == {"data": "from_database"}

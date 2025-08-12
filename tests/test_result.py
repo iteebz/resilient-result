@@ -1,5 +1,7 @@
 """Test suite for Result pattern."""
 
+import pytest
+
 from resilient_result import Err, Ok, Result
 
 
@@ -8,8 +10,7 @@ def test_ok_creation():
     result = Result.ok("success")
     assert result.success is True
     assert result.failure is False
-    assert result.data == "success"
-    assert result.error is None
+    assert result.unwrap() == "success"
     assert bool(result) is True
 
 
@@ -18,8 +19,8 @@ def test_fail_creation():
     result = Result.fail("error message")
     assert result.success is False
     assert result.failure is True
-    assert result.data is None
-    assert result.error == "error message"
+    with pytest.raises(ValueError, match="Result failed with error: error message"):
+        result.unwrap()
     assert bool(result) is False
 
 
@@ -27,8 +28,7 @@ def test_ok_with_none():
     """Test Ok with None data."""
     result = Result.ok(None)
     assert result.success is True
-    assert result.data is None
-    assert result.error is None
+    assert result.unwrap() is None
 
 
 def test_ok_with_various_types():
@@ -36,24 +36,24 @@ def test_ok_with_various_types():
     # String
     result = Result.ok("hello")
     assert result.success is True
-    assert result.data == "hello"
+    assert result.unwrap() == "hello"
 
     # Number
     result = Result.ok(42)
     assert result.success is True
-    assert result.data == 42
+    assert result.unwrap() == 42
 
     # Dict
     data = {"key": "value"}
     result = Result.ok(data)
     assert result.success is True
-    assert result.data == data
+    assert result.unwrap() == data
 
     # List
     data = [1, 2, 3]
     result = Result.ok(data)
     assert result.success is True
-    assert result.data == data
+    assert result.unwrap() == data
 
 
 def test_repr():
@@ -76,7 +76,8 @@ def test_guard_clause_pattern():
 
     result = process_data()
     assert result.failure is True
-    assert result.error == "processing failed"
+    with pytest.raises(ValueError, match="processing failed"):
+        result.unwrap()
 
 
 def test_success_path_pattern():
@@ -85,36 +86,35 @@ def test_success_path_pattern():
     def process_data():
         result = Result.ok("raw data")
         if result.success:
-            processed = result.data.upper()
+            processed = result.unwrap().upper()
             return Result.ok(processed)
         return result
 
     result = process_data()
     assert result.success is True
-    assert result.data == "RAW DATA"
+    assert result.unwrap() == "RAW DATA"
 
 
 def test_ok_alias():
     """Test Ok constructor."""
     result = Ok("success")
     assert result.success is True
-    assert result.data == "success"
-    assert result.error is None
+    assert result.unwrap() == "success"
 
 
 def test_err_alias():
     """Test Err constructor."""
     result = Err("error message")
     assert result.success is False
-    assert result.error == "error message"
-    assert result.data is None
+    with pytest.raises(ValueError, match="error message"):
+        result.unwrap()
 
 
 def test_ok_none():
     """Test Ok with None."""
     result = Ok()
     assert result.success is True
-    assert result.data is None
+    assert result.unwrap() is None
 
 
 def test_mixed_usage():
@@ -131,10 +131,12 @@ def test_mixed_usage():
 
     assert len(successes) == 2
     assert len(failures) == 2
-    assert successes[0].data == "method1"
-    assert successes[1].data == "alias1"
-    assert failures[0].error == "method2"
-    assert failures[1].error == "alias2"
+    assert successes[0].unwrap() == "method1"
+    assert successes[1].unwrap() == "alias1"
+    with pytest.raises(ValueError, match="method2"):
+        failures[0].unwrap()
+    with pytest.raises(ValueError, match="alias2"):
+        failures[1].unwrap()
 
 
 def test_early_return_pattern():
@@ -152,28 +154,30 @@ def test_early_return_pattern():
         # Step 2
         if should_fail_at == 2:
             return Result.fail("Step 2 failed")
-        step2_result = Result.ok(step1_result.data + "_step2")
+        step2_result = Result.ok(step1_result.unwrap() + "_step2")
 
         if not step2_result.success:
             return step2_result
 
         # Success
-        return Result.ok(step2_result.data + "_complete")
+        return Result.ok(step2_result.unwrap() + "_complete")
 
     # All success
     result = multi_step_process()
     assert result.success is True
-    assert result.data == "step1_data_step2_complete"
+    assert result.unwrap() == "step1_data_step2_complete"
 
     # Fail at step 1
     result = multi_step_process(should_fail_at=1)
     assert result.failure is True
-    assert result.error == "Step 1 failed"
+    with pytest.raises(ValueError, match="Step 1 failed"):
+        result.unwrap()
 
     # Fail at step 2
     result = multi_step_process(should_fail_at=2)
     assert result.failure is True
-    assert result.error == "Step 2 failed"
+    with pytest.raises(ValueError, match="Step 2 failed"):
+        result.unwrap()
 
 
 def test_result_aggregation():
@@ -186,8 +190,13 @@ def test_result_aggregation():
         Result.fail("error2"),
     ]
 
-    successes = [r.data for r in results if r.success]
-    failures = [r.error for r in results if r.failure]
-
+    successes = [r.unwrap() for r in results if r.success]
+    # Test failures by checking they raise expected errors
     assert successes == ["data1", "data2", "data3"]
-    assert failures == ["error1", "error2"]
+
+    failures = [r for r in results if r.failure]
+    assert len(failures) == 2
+    with pytest.raises(ValueError, match="error1"):
+        failures[0].unwrap()
+    with pytest.raises(ValueError, match="error2"):
+        failures[1].unwrap()

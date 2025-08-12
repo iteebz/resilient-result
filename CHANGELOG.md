@@ -5,6 +5,17 @@ All notable changes to resilient-result will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2025-08-13
+
+### Changed
+- **BREAKING**: Simplified Result API to 3 canonical methods following "one clear way" principle
+- **BREAKING**: Removed `.is_ok()` and `.is_err()` methods (use `.success`/`.failure` properties) 
+- **BREAKING**: Removed `.unwrap_err()` method (`.unwrap()` raises exceptions on failure)
+- **BREAKING**: Removed standalone `unwrap()` function (use `result.unwrap()` method)
+- **BREAKING**: Removed `.data` property (use `result.unwrap()` for value extraction)
+- **BREAKING**: Retained `.error` property for error inspection (common use case)
+- **3 canonical ways**: `.success`/`.failure` for status, `.error` for inspection, `.unwrap()` for extraction
+
 ## [0.3.1] - 2024-07-30
 
 ### Changed
@@ -76,6 +87,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Zero dependencies - pure Python implementation
 - Comprehensive test coverage
 
+[0.4.0]: https://github.com/iteebz/resilient-result/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/iteebz/resilient-result/compare/v0.2.2...v0.3.1
 [0.2.2]: https://github.com/iteebz/resilient-result/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/iteebz/resilient-result/compare/v0.2.0...v0.2.1

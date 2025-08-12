@@ -71,26 +71,25 @@ def circuit(failures: int = 3, window: int = 300):
                     return Err(e)
 
             return async_circuit_protected
-        else:
 
-            @wraps(func)
-            def sync_circuit_protected(*args, **kwargs):
-                from .result import Err, Ok, Result
+        @wraps(func)
+        def sync_circuit_protected(*args, **kwargs):
+            from .result import Err, Ok, Result
 
-                # Check if circuit is open
-                if circuit_breaker.is_open(func_name, failures, window):
-                    from .errors import CircuitError
+            # Check if circuit is open
+            if circuit_breaker.is_open(func_name, failures, window):
+                from .errors import CircuitError
 
-                    return Err(CircuitError("Circuit breaker open"))
+                return Err(CircuitError("Circuit breaker open"))
 
-                try:
-                    result = func(*args, **kwargs)
-                    circuit_breaker.record_success(func_name)
-                    return Ok(result) if not isinstance(result, Result) else result
-                except Exception as e:
-                    circuit_breaker.record_failure(func_name)
-                    return Err(e)
+            try:
+                result = func(*args, **kwargs)
+                circuit_breaker.record_success(func_name)
+                return Ok(result) if not isinstance(result, Result) else result
+            except Exception as e:
+                circuit_breaker.record_failure(func_name)
+                return Err(e)
 
-            return sync_circuit_protected
+        return sync_circuit_protected
 
     return decorator

@@ -1,14 +1,14 @@
-"""Tests for unwrap() utility function."""
+"""Tests for .unwrap() method."""
 
 import pytest
 
-from resilient_result import Err, Ok, unwrap
+from resilient_result import Err, Ok
 
 
 def test_unwrap_success():
     """unwrap() should extract data from successful Result."""
     result = Ok("test_data")
-    assert unwrap(result) == "test_data"
+    assert result.unwrap() == "test_data"
 
 
 def test_unwrap_failure_with_exception():
@@ -17,7 +17,7 @@ def test_unwrap_failure_with_exception():
     result = Err(original_error)
 
     with pytest.raises(ValueError, match="test error"):
-        unwrap(result)
+        result.unwrap()
 
 
 def test_unwrap_failure_with_string():
@@ -25,13 +25,13 @@ def test_unwrap_failure_with_string():
     result = Err("string error")
 
     with pytest.raises(ValueError, match="Result failed with error: string error"):
-        unwrap(result)
+        result.unwrap()
 
 
 def test_unwrap_none_data():
     """unwrap() should handle None data correctly."""
     result = Ok(None)
-    assert unwrap(result) is None
+    assert result.unwrap() is None
 
 
 def test_unwrap_with_resilient_operations():
@@ -43,5 +43,5 @@ def test_unwrap_with_resilient_operations():
         return "success"
 
     result = simple_operation()
-    data = unwrap(result)
+    data = result.unwrap()
     assert data == "success"

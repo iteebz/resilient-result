@@ -72,7 +72,7 @@ async def test_isolation():
     assert elapsed_a >= 0.015
     assert elapsed_b < 0.005
     assert result_b.success
-    assert result_b.data == "B"
+    assert result_b.unwrap() == "B"
 
 
 @pytest.mark.asyncio
@@ -97,4 +97,4 @@ async def test_custom_key():
 
     assert elapsed >= 0.015
     assert result.success
-    assert result.data == "Y"
+    assert result.unwrap() == "Y"

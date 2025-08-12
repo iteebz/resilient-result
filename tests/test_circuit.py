@@ -55,7 +55,7 @@ async def test_resets_after_window(call_counter):
     await asyncio.sleep(0.11)
     result = await func()
     assert result.success
-    assert result.data == "success"
+    assert result.unwrap() == "success"
 
 
 @pytest.mark.asyncio
@@ -81,7 +81,7 @@ async def test_isolation():
 
     # B still works
     result_b = await func_b()
-    assert result_b.is_ok()
+    assert result_b.success
     assert result_b.unwrap() == "success"
 
 
@@ -98,16 +98,16 @@ async def test_success_doesnt_trigger(call_counter):
 
     # Fail, succeed, fail - should still work
     result1 = await func()
-    assert result1.is_err()
+    assert result1.failure
 
     result2 = await func()
-    assert result2.is_ok()
+    assert result2.success
     assert result2.unwrap() == "success 2"
 
     result3 = await func()
-    assert result3.is_err()
+    assert result3.failure
 
     # 4th call should work (only 2 failures)
     result4 = await func()
-    assert result4.is_ok()
+    assert result4.success
     assert result4.unwrap() == "success 4"

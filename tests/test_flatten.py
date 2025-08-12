@@ -10,7 +10,7 @@ def test_no_nesting():
     result = Ok("data")
     flattened = result.flatten()
     assert flattened.success
-    assert flattened.data == "data"
+    assert flattened.unwrap() == "data"
 
 
 def test_single_level_success():
@@ -18,7 +18,7 @@ def test_single_level_success():
     nested = Ok(Ok("inner_data"))
     flattened = nested.flatten()
     assert flattened.success
-    assert flattened.data == "inner_data"
+    assert flattened.unwrap() == "inner_data"
 
 
 def test_single_level_failure():
@@ -34,7 +34,7 @@ def test_multiple_levels():
     deeply_nested = Ok(Ok(Ok("deep_data")))
     flattened = deeply_nested.flatten()
     assert flattened.success
-    assert flattened.data == "deep_data"
+    assert flattened.unwrap() == "deep_data"
 
 
 def test_outer_failure():
@@ -59,7 +59,7 @@ def test_preserves_non_result():
     result = Ok({"key": "value"})
     flattened = result.flatten()
     assert flattened.success
-    assert flattened.data == {"key": "value"}
+    assert flattened.unwrap() == {"key": "value"}
 
 
 # Test @resilient decorator automatically flattens nested Results
@@ -75,9 +75,9 @@ async def test_async_nested_ok():
 
     result = await returns_nested_ok()
     assert result.success
-    assert result.data == "inner_data"
+    assert result.unwrap() == "inner_data"
     # Verify no nested Result structure
-    assert not isinstance(result.data, Result)
+    assert not isinstance(result.unwrap(), Result)
 
 
 @pytest.mark.asyncio
@@ -101,13 +101,12 @@ async def test_deep_nesting():
     async def returns_deeply_nested():
         # Simulates calling multiple Result-returning functions
         inner_result = Ok("final_data")
-        middle_result = Ok(inner_result)
-        return middle_result  # Creates Ok(Ok(Ok("final_data")))
+        return Ok(inner_result)  # Creates Ok(Ok("final_data"))
 
     result = await returns_deeply_nested()
     assert result.success
-    assert result.data == "final_data"
-    assert not isinstance(result.data, Result)
+    assert result.unwrap() == "final_data"
+    assert not isinstance(result.unwrap(), Result)
 
 
 def test_sync_nested():
@@ -119,8 +118,8 @@ def test_sync_nested():
 
     result = returns_nested_sync()
     assert result.success
-    assert result.data == "sync_data"
-    assert not isinstance(result.data, Result)
+    assert result.unwrap() == "sync_data"
+    assert not isinstance(result.unwrap(), Result)
 
 
 @pytest.mark.asyncio
@@ -141,8 +140,8 @@ async def test_error_inside_nested_result():
 async def test_boundary_discipline():
     """Test real-world boundary discipline scenario."""
 
-    # Simulate parse_json function that returns Result
-    def parse_json(text: str) -> Result[dict, str]:
+    # Simulate _parse_json function that returns Result
+    def _parse_json(text: str) -> Result[dict, str]:
         try:
             import json
 
@@ -151,23 +150,23 @@ async def test_boundary_discipline():
             return Err(e)
 
     # Simulate LLM function that returns Result
-    async def llm_call(prompt: str) -> Result[str, str]:
+    async def provider_call(prompt: str) -> Result[str, str]:
         return Ok('{"key": "value"}')  # Mock JSON response
 
     @resilient()
-    async def preprocess_function():
+    async def prepare_function():
         # This is the clean boundary discipline pattern
-        llm_response = await llm_call("test prompt")  # Returns Result
-        if not llm_response.success:
-            return llm_response  # Pass through error
+        response = await provider_call("test prompt")  # Returns Result
+        if not response.success:
+            return response  # Pass through error
 
-        parsed_data = parse_json(llm_response.data)  # Returns Result
+        parsed_data = _parse_json(response.unwrap())  # Returns Result
         if not parsed_data.success:
             return parsed_data  # Pass through error
 
         return parsed_data  # Return the final Result
 
-    result = await preprocess_function()
+    result = await prepare_function()
     assert result.success
-    assert result.data == {"key": "value"}
-    assert not isinstance(result.data, Result)
+    assert result.unwrap() == {"key": "value"}
+    assert not isinstance(result.unwrap(), Result)

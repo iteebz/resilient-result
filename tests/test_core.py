@@ -1,6 +1,5 @@
 """Core tests for Option D implementation - resilient decorators + Result returns."""
 
-
 import pytest
 
 from resilient_result import Err, Ok, Retry, resilient
@@ -22,7 +21,7 @@ async def test_basic_success():
 
     result = await success_func()
     assert result.success
-    assert result.data == "success"
+    assert result.unwrap() == "success"
 
 
 @pytest.mark.asyncio
@@ -63,7 +62,7 @@ async def test_result_passthrough():
 
     result = await returns_result()
     assert result.success
-    assert result.data == "already wrapped"
+    assert result.unwrap() == "already wrapped"
 
     @resilient()
     async def returns_err():
@@ -104,7 +103,7 @@ def test_sync_support():
 
     result = sync_func()
     assert result.success
-    assert result.data == "sync success"
+    assert result.unwrap() == "sync success"
 
 
 def test_decorator_syntax():

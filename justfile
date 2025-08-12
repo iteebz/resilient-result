@@ -8,9 +8,8 @@ test:
 test-cov:
     poetry run pytest --cov=resilient_result --cov-report=term-missing
 
-# Format code with black and ruff
+# Format code with ruff
 format:
-    poetry run black .
     poetry run ruff format .
 
 # Lint and check with ruff

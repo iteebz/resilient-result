@@ -1,4 +1,4 @@
-"""Perfect Result pattern - concise factories, descriptive properties."""
+"""Result type for error handling."""
 
 import asyncio
 from typing import Any, Generic, List, TypeVar
@@ -8,11 +8,11 @@ E = TypeVar("E")
 
 
 class Result(Generic[T, E]):
-    """Perfect Result pattern - best of both worlds."""
+    """Result type for success and failure cases."""
 
     def __init__(self, data: T = None, error: E = None):
-        self.data = data
-        self.error = error
+        self._data = data
+        self._error = error
 
     @classmethod
     def ok(cls, data: T = None) -> "Result[T, E]":
@@ -26,13 +26,18 @@ class Result(Generic[T, E]):
 
     @property
     def success(self) -> bool:
-        """Check if successful."""
-        return self.error is None
+        """True if result is successful."""
+        return self._error is None
 
     @property
     def failure(self) -> bool:
-        """Check if failed."""
-        return self.error is not None
+        """True if result is failed."""
+        return self._error is not None
+
+    @property
+    def error(self) -> E:
+        """Error value for inspection."""
+        return self._error
 
     def __bool__(self) -> bool:
         """Allow if result: checks."""
@@ -49,8 +54,8 @@ class Result(Generic[T, E]):
             return self  # Already failed, nothing to flatten
 
         # If data is a Result, flatten it
-        if isinstance(self.data, Result):
-            return self.data.flatten()  # Recursively flatten
+        if isinstance(self._data, Result):
+            return self._data.flatten()  # Recursively flatten
 
         return self  # No nesting, return as-is
 
@@ -68,10 +73,10 @@ class Result(Generic[T, E]):
         for result in results:
             if isinstance(result, Exception):
                 return cls.fail(result)
-            elif isinstance(result, Result):
+            if isinstance(result, Result):
                 if result.failure:
-                    return cls.fail(result.error)
-                collected_data.append(result.data)
+                    return cls.fail(result._error)
+                collected_data.append(result._data)
             else:
                 collected_data.append(result)
 
@@ -81,63 +86,28 @@ class Result(Generic[T, E]):
         """Compare Results by value."""
         if not isinstance(other, Result):
             return False
-        return self.data == other.data and self.error == other.error
-
-    def is_ok(self) -> bool:
-        """Rust-style success check."""
-        return self.success
-
-    def is_err(self) -> bool:
-        """Rust-style failure check."""
-        return self.failure
+        return self._data == other._data and self._error == other._error
 
     def unwrap(self):
-        """Extract data from Result, raising exception if failed."""
+        """Extract data, raising exception if failed."""
         if self.success:
-            return self.data
-        else:
-            # Raise the original error if it's an exception, otherwise wrap it
-            if isinstance(self.error, Exception):
-                raise self.error
-            else:
-                raise ValueError(f"Result failed with error: {self.error}")
-
-    def unwrap_err(self):
-        """Extract error from Result, raising exception if successful."""
-        if self.failure:
-            return self.error
-        else:
-            raise ValueError("Called unwrap_err on successful Result")
+            return self._data
+        if isinstance(self._error, Exception):
+            raise self._error
+        raise ValueError(f"Result failed with error: {self._error}")
 
     def __repr__(self) -> str:
         if self.success:
-            return f"Result.ok({repr(self.data)})"
-        else:
-            return f"Result.fail({repr(self.error)})"
+            return f"Result.ok({repr(self._data)})"
+        return f"Result.fail({repr(self._error)})"
 
 
-# Rust-style constructors that return proper Result instances
+# Constructor functions
 def Ok(data: T = None) -> Result[T, Any]:
-    """Rust-style Ok constructor - returns proper Result instance."""
+    """Create successful result."""
     return Result.ok(data)
 
 
 def Err(error: E) -> Result[Any, E]:
-    """Rust-style Err constructor - returns proper Result instance."""
+    """Create failed result."""
     return Result.fail(error)
-
-
-def unwrap(result: Result[T, E]) -> T:
-    """Extract data from Result, raising exception if failed.
-
-    Usage:
-        data = unwrap(some_operation())  # Raises if failed
-    """
-    if result.success:
-        return result.data
-    else:
-        # Raise the original error if it's an exception, otherwise wrap it
-        if isinstance(result.error, Exception):
-            raise result.error
-        else:
-            raise ValueError(f"Result failed with error: {result.error}")

@@ -21,7 +21,7 @@ async def test_collect_all_success():
     result = await Result.collect([op1(), op2(), op3()])
 
     assert result.success
-    assert result.data == ["result1", "result2", "result3"]
+    assert result.unwrap() == ["result1", "result2", "result3"]
 
 
 @pytest.mark.asyncio
@@ -37,7 +37,7 @@ async def test_collect_with_result_objects():
     result = await Result.collect([success_op(), another_success()])
 
     assert result.success
-    assert result.data == ["success_data", "more_data"]
+    assert result.unwrap() == ["success_data", "more_data"]
 
 
 @pytest.mark.asyncio
@@ -82,7 +82,7 @@ async def test_collect_empty_list():
     result = await Result.collect([])
 
     assert result.success
-    assert result.data == []
+    assert result.unwrap() == []
 
 
 @pytest.mark.asyncio
@@ -100,4 +100,4 @@ async def test_collect_with_resilient_operations():
     result = await Result.collect([op1(), op2()])
 
     assert result.success
-    assert result.data == ["data1", "data2"]
+    assert result.unwrap() == ["data1", "data2"]

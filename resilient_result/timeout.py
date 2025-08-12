@@ -25,16 +25,16 @@ def timeout(seconds: float, error_type: type = TimeoutError):
                     return Err(e)
 
             return async_wrapper
-        else:
-            # Sync functions can't have true timeouts, but wrap in Result
-            @wraps(func)
-            def sync_wrapper(*args, **kwargs):
-                try:
-                    result = func(*args, **kwargs)
-                    return Ok(result) if not isinstance(result, Result) else result
-                except Exception as e:
-                    return Err(e)
 
-            return sync_wrapper
+        # Sync functions can't have true timeouts, but wrap in Result
+        @wraps(func)
+        def sync_wrapper(*args, **kwargs):
+            try:
+                result = func(*args, **kwargs)
+                return Ok(result) if not isinstance(result, Result) else result
+            except Exception as e:
+                return Err(e)
+
+        return sync_wrapper
 
     return decorator

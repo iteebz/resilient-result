@@ -102,7 +102,7 @@ async def test_basic_policy_usage(call_counter, fast_backoff):
 
     result = await func()
     assert result.success
-    assert result.data == "success"
+    assert result.unwrap() == "success"
     assert call_counter.count == 2
 
 
@@ -127,7 +127,7 @@ async def test_presets(call_counter):
 
     result = await api_call()
     assert result.success
-    assert result.data == {"data": "success"}
+    assert result.unwrap() == {"data": "success"}
     assert call_counter.count == 3
 
 
@@ -141,7 +141,7 @@ async def test_default_policies(call_counter):
 
     result = await func()
     assert result.success
-    assert result.data == "default success"
+    assert result.unwrap() == "default success"
     assert call_counter.count == 2
 
 
@@ -154,5 +154,5 @@ def test_sync_policies(call_counter, fast_backoff):
 
     result = func()
     assert result.success
-    assert result.data == "sync success"
+    assert result.unwrap() == "sync success"
     assert call_counter.count == 2

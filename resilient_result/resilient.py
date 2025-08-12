@@ -79,36 +79,35 @@ def retry(
                 return Err(_format_error(last_exception))
 
             return async_wrapper
-        else:
 
-            @wraps(func)
-            def sync_wrapper(*args, **kwargs):
-                import time
+        @wraps(func)
+        def sync_wrapper(*args, **kwargs):
+            import time
 
-                last_exception = None
-                for attempt in range(attempts):
-                    try:
-                        result = func(*args, **kwargs)
-                        return (
-                            Ok(result)
-                            if not isinstance(result, Result)
-                            else result.flatten()
-                        )
-                    except Exception as e:
-                        last_exception = e
+            last_exception = None
+            for attempt in range(attempts):
+                try:
+                    result = func(*args, **kwargs)
+                    return (
+                        Ok(result)
+                        if not isinstance(result, Result)
+                        else result.flatten()
+                    )
+                except Exception as e:
+                    last_exception = e
 
-                        # Check if we should stop retrying
-                        if _should_stop_retrying_sync(e, attempt):
-                            return Err(_format_error(e))
+                    # Check if we should stop retrying
+                    if _should_stop_retrying_sync(e, attempt):
+                        return Err(_format_error(e))
 
-                        # If this is the last attempt, don't sleep
-                        if attempt < attempts - 1:
-                            time.sleep(backoff.calculate(attempt))
+                    # If this is the last attempt, don't sleep
+                    if attempt < attempts - 1:
+                        time.sleep(backoff.calculate(attempt))
 
-                # Return the last exception we caught
-                return Err(_format_error(last_exception))
+            # Return the last exception we caught
+            return Err(_format_error(last_exception))
 
-            return sync_wrapper
+        return sync_wrapper
 
     return decorator
 
@@ -163,14 +162,13 @@ class Resilient:
                     handler=handler,
                 ),
             )
-        else:
-            # Just retry
-            return globals()["retry"](
-                attempts=retry_policy.attempts,
-                backoff=backoff_policy,
-                error_type=error_type,
-                handler=handler,
-            )
+        # Just retry
+        return globals()["retry"](
+            attempts=retry_policy.attempts,
+            backoff=backoff_policy,
+            error_type=error_type,
+            handler=handler,
+        )
 
     # Direct pattern access
     @staticmethod
@@ -212,14 +210,13 @@ class Resilient:
                     return Ok(result) if not isinstance(result, Result) else result
 
                 return async_wrapper
-            else:
 
-                @wraps(func)
-                def sync_wrapper(*args, **kwargs):
-                    result = rate_limit_func(*args, **kwargs)
-                    return Ok(result) if not isinstance(result, Result) else result
+            @wraps(func)
+            def sync_wrapper(*args, **kwargs):
+                result = rate_limit_func(*args, **kwargs)
+                return Ok(result) if not isinstance(result, Result) else result
 
-                return sync_wrapper
+            return sync_wrapper
 
         return result_wrapper
 

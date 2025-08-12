@@ -62,18 +62,17 @@ def rate_limit(rps: float = 1.0, burst: int = None, key: str = None):
                     return Err(e)
 
             return async_rate_limited
-        else:
 
-            @wraps(func)
-            def sync_rate_limited(*args, **kwargs):
-                try:
-                    # Note: Sync functions can't properly rate limit without blocking
-                    # Consider using async version for true rate limiting
-                    result = func(*args, **kwargs)
-                    return Ok(result) if not isinstance(result, Result) else result
-                except Exception as e:
-                    return Err(e)
+        @wraps(func)
+        def sync_rate_limited(*args, **kwargs):
+            try:
+                # Note: Sync functions can't properly rate limit without blocking
+                # Consider using async version for true rate limiting
+                result = func(*args, **kwargs)
+                return Ok(result) if not isinstance(result, Result) else result
+            except Exception as e:
+                return Err(e)
 
-            return sync_rate_limited
+        return sync_rate_limited
 
     return decorator

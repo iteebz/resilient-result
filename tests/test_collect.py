@@ -6,7 +6,7 @@ from resilient_result import Err, Ok, Result, resilient
 
 
 @pytest.mark.asyncio
-async def test_collect_all_success():
+async def test_collect_success():
     """collect() should succeed when all operations succeed."""
 
     async def op1():
@@ -25,7 +25,7 @@ async def test_collect_all_success():
 
 
 @pytest.mark.asyncio
-async def test_collect_with_result_objects():
+async def test_collect_results():
     """collect() should handle operations that return Result objects."""
 
     async def success_op():
@@ -41,7 +41,7 @@ async def test_collect_with_result_objects():
 
 
 @pytest.mark.asyncio
-async def test_collect_with_failure():
+async def test_collect_failure():
     """collect() should fail if any operation fails."""
 
     async def success_op():
@@ -61,7 +61,7 @@ async def test_collect_with_failure():
 
 
 @pytest.mark.asyncio
-async def test_collect_with_result_failure():
+async def test_collect_result_failure():
     """collect() should handle Result objects that contain failures."""
 
     async def success_op():
@@ -77,7 +77,7 @@ async def test_collect_with_result_failure():
 
 
 @pytest.mark.asyncio
-async def test_collect_empty_list():
+async def test_collect_empty():
     """collect() should handle empty operation list."""
     result = await Result.collect([])
 
@@ -86,7 +86,7 @@ async def test_collect_empty_list():
 
 
 @pytest.mark.asyncio
-async def test_collect_with_resilient_operations():
+async def test_collect_resilient():
     """collect() should work with @resilient decorated functions."""
 
     @resilient

@@ -85,7 +85,7 @@ def slow_func():
 
     @resilient()
     async def func():
-        await asyncio.sleep(0.1)
+        await asyncio.sleep(0.1)  # Will be mocked to be instant
         return "too slow"
 
     return func

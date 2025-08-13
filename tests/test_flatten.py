@@ -13,7 +13,7 @@ def test_no_nesting():
     assert flattened.unwrap() == "data"
 
 
-def test_single_level_success():
+def test_single_success():
     """Test flatten on single-level nested Ok Result."""
     nested = Ok(Ok("inner_data"))
     flattened = nested.flatten()
@@ -21,7 +21,7 @@ def test_single_level_success():
     assert flattened.unwrap() == "inner_data"
 
 
-def test_single_level_failure():
+def test_single_failure():
     """Test flatten when inner Result is Err."""
     nested = Ok(Err("inner_error"))
     flattened = nested.flatten()

@@ -39,7 +39,7 @@ async def test_basic_failure():
 
 
 @pytest.mark.asyncio
-async def test_custom_error_type():
+async def test_custom_error():
     """Test custom error_type parameter."""
 
     @resilient(error_type=CustomError)
@@ -122,7 +122,7 @@ def test_decorator_syntax():
 
 
 @pytest.mark.asyncio
-async def test_static_methods_return_results():
+async def test_static_methods():
     """Test @resilient.* static methods return Result types."""
 
     @resilient.retry()

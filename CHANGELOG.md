@@ -5,6 +5,28 @@ All notable changes to resilient-result will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.1] - 2025-08-13
+
+### Changed
+- **BREAKING**: Deleted all preset methods for constitutional compliance
+- **BREAKING**: Removed `Retry.api()`, `Retry.db()`, `Retry.ml()` - use `Retry(attempts=N)` 
+- **BREAKING**: Removed `Circuit.fast()`, `Circuit.standard()` - use `Circuit(failures=N)`
+- **BREAKING**: Removed `Timeout.api()`, `Timeout.db()`, `Timeout.ml()` - use `Timeout(seconds=N)`
+- **BREAKING**: Removed `compose()` function - use decorator stacking
+- **BREAKING**: Changed defaults to universal reasonable values:
+  - Retry: 2 attempts (was 3), 1s fixed backoff (was exponential) 
+  - Circuit: 3 failures (was 5), 60s window (was 300s)
+  - Timeout: 30s universal default
+  - Rate limit: 100 rps (was 10 rps) - more realistic for modern APIs
+
+### Added
+- **Single source of truth**: All defaults imported from `defaults.py` module
+- **Progressive disclosure**: `@resilient()` for simple cases, individual decorators for power users
+- **Simplified API**: Removed choice paralysis - one obvious way for each use case
+- **Retry logging**: DEBUG level logging shows retry attempts and backoff delays, INFO level logs successful recovery
+- **Constitutional compliance**: Eliminated API multiplication, verbose naming, and dual defaults
+- **Jitter support**: Backoff strategies include jitter by default to prevent thundering herd problems
+
 ## [0.4.0] - 2025-08-13
 
 ### Changed

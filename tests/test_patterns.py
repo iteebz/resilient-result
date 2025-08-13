@@ -20,10 +20,11 @@ async def test_retry_exhausted():
 
 @pytest.mark.asyncio
 async def test_composition_patterns():
-    """Test composing mechanism-focused decorators."""
-    from resilient_result import compose, timeout
+    """Test composing decorators with stacking."""
+    from resilient_result import timeout
 
-    @compose(timeout(1.0), retry(attempts=2))
+    @timeout(seconds=1.0)
+    @retry(attempts=2)
     async def complex_operation():
         return "composed success"
 
@@ -33,10 +34,10 @@ async def test_composition_patterns():
 
 
 @pytest.mark.asyncio
-async def test_resilient_presets():
-    """Test resilient class presets are mechanism-focused."""
+async def test_resilient_basic():
+    """Test basic resilient decorator."""
 
-    @resilient.api()  # Composed timeout + retry
+    @resilient()  # Basic retry pattern
     async def api_call():
         return "api success"
 
@@ -49,7 +50,7 @@ async def test_resilient_presets():
 async def test_policy_based_retry():
     """Test policy-based retry configuration."""
 
-    @resilient(retry=Retry.db())  # Database preset
+    @resilient(retry=Retry(attempts=5))  # Explicit configuration
     async def db_operation():
         return {"data": "from_database"}
 

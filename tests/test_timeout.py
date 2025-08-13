@@ -8,7 +8,7 @@ from resilient_result import Ok, timeout
 
 
 def test_sync_timeout_success():
-    @timeout(1.0)
+    @timeout(seconds=1.0)
     def fast():
         return "success"
 
@@ -17,7 +17,7 @@ def test_sync_timeout_success():
 
 
 def test_sync_timeout_error():
-    @timeout(1.0)
+    @timeout(seconds=1.0)
     def failing():
         raise ValueError("boom")
 
@@ -28,7 +28,7 @@ def test_sync_timeout_error():
 
 @pytest.mark.asyncio
 async def test_async_timeout_success():
-    @timeout(1.0)
+    @timeout(seconds=1.0)
     async def fast():
         await asyncio.sleep(0.1)
         return "success"
@@ -39,7 +39,7 @@ async def test_async_timeout_success():
 
 @pytest.mark.asyncio
 async def test_async_timeout_exceeded():
-    @timeout(0.1)
+    @timeout(seconds=0.1)
     async def slow():
         await asyncio.sleep(0.2)
         return "never"
@@ -51,7 +51,7 @@ async def test_async_timeout_exceeded():
 
 @pytest.mark.asyncio
 async def test_async_timeout_error():
-    @timeout(1.0)
+    @timeout(seconds=1.0)
     async def failing():
         raise ValueError("boom")
 

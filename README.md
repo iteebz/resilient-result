@@ -7,11 +7,17 @@
 **Resilience mechanisms with Result types.**
 
 ```python
-from resilient_result import retry, timeout, Result
+from resilient_result import resilient, Result
 
-@retry(attempts=3)
-@timeout(10.0)
+# Simple: perfect defaults for most cases
+@resilient()
 async def call_api(url: str) -> str:
+    return await http.get(url)
+
+# Advanced: compose individual mechanisms
+@timeout(seconds=10)
+@retry(attempts=5)  
+async def robust_call(url: str) -> str:
     return await http.get(url)
 
 result: Result[str, Exception] = await call_api("https://api.example.com")
@@ -22,7 +28,9 @@ else:
     print(f"Failed: {result.error}")  # Inspect error directly
 ```
 
-**Why resilient-result?** Pure mechanisms over domain patterns, Result types over exceptions, orthogonal composition.
+**Why resilient-result?** Network calls fail. Databases timeout. APIs rate limit. Handle it cleanly without exception soup.
+
+**Observability built-in:** Enable `logging.getLogger('resilient_result').setLevel(logging.DEBUG)` to see retry attempts and recovery.
 
 **📖 [Result API](docs/result.md) | 🔧 [Resilience Patterns](docs/resilient.md)**
 
@@ -34,15 +42,21 @@ pip install resilient-result
 
 ## Core Features
 
-### Pure Mechanism Composition
-```python
-from resilient_result import retry, timeout, circuit, rate_limit
+### Progressive Disclosure
 
-# Orthogonal composition - each decorator handles one concern
-@retry(attempts=3)           # Retry mechanism
-@timeout(10.0)               # Time-based protection  
-@circuit(failures=5)         # Circuit breaker protection
-@rate_limit(rps=100)         # Rate limiting mechanism
+```python
+from resilient_result import resilient, retry, timeout, circuit, rate_limit
+
+# Simple: Just works with reasonable defaults
+@resilient()  # 2 attempts, 1s backoff, 30s timeout
+async def simple_operation():
+    return await external_service()
+
+# Advanced: Compose individual mechanisms
+@rate_limit(rps=100)         # Rate limiting (100 rps default)
+@circuit(failures=3)         # Circuit breaker (1 minute window)
+@timeout(seconds=10)         # Time-based protection
+@retry(attempts=5)           # Retry mechanism
 async def critical_operation():
     return await external_service()
 ```
@@ -73,23 +87,24 @@ except ApiError as e:
     log_error(e)
 ```
 
-### Advanced Composition
+### Policy Configuration
 ```python
-from resilient_result import compose, resilient
+from resilient_result import Retry, Backoff, Circuit, resilient
 
-# Manual composition - right to left
-@compose(
-    circuit(failures=3),
-    timeout(10.0), 
-    retry(attempts=3)
+# Explicit policy configuration
+@resilient(
+    retry=Retry(attempts=5, timeout=60),
+    backoff=Backoff.exp(delay=0.1, max_delay=10),  # Jitter enabled by default
+    circuit=Circuit(failures=3, window=60)  # 1 minute window
 )
-async def robust_operation():
+async def custom_operation():
     return await external_service()
 
-# Pre-built patterns
-@resilient.api()       # timeout(30) + retry(3)
-@resilient.db()        # timeout(60) + retry(5)
-@resilient.protected() # circuit + retry
+# Shorthand for common patterns
+@resilient(retry=Retry(attempts=5))  # Just more attempts
+@resilient(timeout=60)               # Just longer timeout
+async def database_operation():
+    return await db.query()
 ```
 
 ### Parallel Operations

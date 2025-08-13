@@ -4,11 +4,11 @@ from .circuit import circuit
 from .errors import CircuitError, RateLimitError, RetryError
 from .policies import Backoff, Circuit, Retry, Timeout
 from .rate_limit import rate_limit
-from .resilient import Resilient, compose, resilient, retry
+from .resilient import Resilient, resilient, retry
 from .result import Err, Ok, Result
 from .timeout import timeout
 
-__version__ = "0.4.0"
+__version__ = "0.4.1"
 __all__ = [
     "Result",
     "Ok",
@@ -16,7 +16,6 @@ __all__ = [
     "resilient",
     "Resilient",
     "retry",
-    "compose",
     "timeout",
     "circuit",
     "rate_limit",

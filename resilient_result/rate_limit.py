@@ -41,8 +41,8 @@ class RateLimiter:
 rate_limiter = RateLimiter()
 
 
-def rate_limit(rps: float = 1.0, burst: int = None, key: str = None):
-    """Token bucket rate limiting."""
+def rate_limit(rps: float = 10.0, burst: int = None, key: str = None):
+    """10 rps rate limiting - reasonable everywhere."""
 
     def decorator(func):
         from .result import Err, Ok, Result

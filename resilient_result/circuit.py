@@ -6,6 +6,8 @@ from collections import defaultdict
 from functools import wraps
 from typing import Dict
 
+from .defaults import CIRCUIT_FAILURES, CIRCUIT_WINDOW
+
 
 class CircuitBreaker:
     """Minimal circuit breaker for runaway protection."""
@@ -36,14 +38,12 @@ class CircuitBreaker:
 circuit_breaker = CircuitBreaker()
 
 
-def circuit(failures: int = 3, window: int = 300):
-    """Circuit breaker decorator - returns Result types for consistent interface.
+def circuit(failures: int = CIRCUIT_FAILURES, window: int = CIRCUIT_WINDOW):
+    """3 failures circuit breaker - reasonable everywhere.
 
     On success: returns Ok(result)
     On failure: records failure and returns Err(exception)
     Circuit open: returns Err(CircuitError)
-
-    This maintains the Result interface while providing circuit breaker functionality.
     """
 
     def decorator(func):

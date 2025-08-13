@@ -3,32 +3,47 @@
 ## Core Decorators
 
 ```python
-@retry()                    # 3 attempts, exponential backoff
+@retry()                    # 2 attempts, 1s fixed backoff
 @retry(attempts=5)          # Custom attempts
-@timeout(10.0)              # 10 second timeout
-@circuit(failures=5)        # Circuit breaker
-@rate_limit(rps=100)        # Rate limiting
+@timeout()                  # 30 second timeout
+@timeout(seconds=10)        # Custom timeout  
+@circuit()                  # 3 failures, 60s window
+@circuit(failures=5)        # Custom threshold
+@rate_limit()               # 100 rps rate limiting
+@rate_limit(rps=500)        # Custom rate
 ```
 
 ## Composition
 
+**Order matters - decorators execute right-to-left:**
+
 ```python
-@retry(attempts=3)
-@timeout(10.0) 
-@circuit(failures=5)
-@rate_limit(rps=100)
+@rate_limit()    # 4. Controls call frequency  
+@circuit()       # 3. Stops calling if broken
+@timeout()       # 2. Kills slow calls
+@retry()         # 1. Retries failures
 async def api_call():
     return await http.get(url)
 ```
+
+**Execution flow:**
+1. Retry wrapper attempts the call
+2. Timeout wrapper kills if > 30s  
+3. Circuit wrapper blocks if service is broken
+4. Rate limit wrapper controls frequency
 
 ## Policies
 
 ```python
 from resilient_result import Retry, Backoff
 
-@retry(attempts=5, backoff=Backoff.linear(start=1.0, step=0.5))
-@retry(attempts=3, backoff=Backoff.exponential(base=2.0))
+# Jitter enabled by default to prevent thundering herd
+@retry(attempts=5, backoff=Backoff.linear(delay=1.0))
+@retry(attempts=3, backoff=Backoff.exp(delay=0.1))
 @retry(attempts=3, backoff=Backoff.fixed(delay=1.0))
+
+# Disable jitter for deterministic timing (testing)
+@retry(backoff=Backoff.exp(delay=1.0, jitter=False))
 ```
 
 ## Presets

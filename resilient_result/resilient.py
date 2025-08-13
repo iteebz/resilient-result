@@ -1,46 +1,61 @@
 """Beautiful @resilient decorators for resilient operations."""
 
 import asyncio
+import logging
+import time
 from functools import wraps
 from typing import TYPE_CHECKING, Optional
+
+from .circuit import circuit
+from .defaults import (
+    CIRCUIT_FAILURES,
+    CIRCUIT_WINDOW,
+    RATE_LIMIT_RPS,
+    RETRY_ATTEMPTS,
+    TIMEOUT_SECONDS,
+)
+from .rate_limit import rate_limit
+from .result import Err, Ok, Result
+from .timeout import timeout
 
 if TYPE_CHECKING:
     from .policies import Backoff
 
-# All plugins now unified in plugins.py
+logger = logging.getLogger("resilient_result")
 
 
 def retry(
-    attempts: int = 3,
+    attempts: int = RETRY_ATTEMPTS,
     backoff: Optional["Backoff"] = None,
     error_type: Optional[type] = None,
     handler=None,
 ):
-    """Pure retry decorator - clean, orthogonal, beautiful."""
+    """2 attempts, 1s fixed backoff - reasonable everywhere."""
     from .policies import Backoff
 
     if backoff is None:
-        backoff = Backoff.exp()
+        backoff = Backoff.fixed(1.0)
+
     if error_type is None:
         error_type = Exception
 
-    async def _should_stop_retrying_async(e, attempt):
+    async def _should_stop_async(e, attempt):
         """Check if we should stop retrying based on async handler."""
         if handler and asyncio.iscoroutinefunction(handler):
-            handler_result = await handler(e)
-            if handler_result is False:
+            result = await handler(e)
+            if result is False:
                 return True
         elif handler:
-            handler_result = handler(e)
-            if handler_result is False:
+            result = handler(e)
+            if result is False:
                 return True
         return False
 
-    def _should_stop_retrying_sync(e, attempt):
+    def _should_stop_sync(e, attempt):
         """Check if we should stop retrying based on sync handler."""
         if handler and not asyncio.iscoroutinefunction(handler):
-            handler_result = handler(e)
-            if handler_result is False:
+            result = handler(e)
+            if result is False:
                 return True
         return False
 
@@ -49,78 +64,93 @@ def retry(
         return e if error_type is Exception else error_type(str(e))
 
     def decorator(func):
-        from .result import Err, Ok, Result
-
         if asyncio.iscoroutinefunction(func):
 
             @wraps(func)
             async def async_wrapper(*args, **kwargs):
-                last_exception = None
+                error = None
                 for attempt in range(attempts):
                     try:
                         result = await func(*args, **kwargs)
+                        # Log success if we had retries
+                        if attempt > 0:
+                            logger.info(
+                                "%s succeeded after %d attempts",
+                                func.__name__,
+                                attempt + 1,
+                            )
                         return (
                             Ok(result)
                             if not isinstance(result, Result)
                             else result.flatten()
                         )
                     except Exception as e:
-                        last_exception = e
+                        error = e
 
                         # Check if we should stop retrying
-                        if await _should_stop_retrying_async(e, attempt):
+                        if await _should_stop_async(e, attempt):
                             return Err(_format_error(e))
 
-                        # If this is the last attempt, don't sleep
+                        # If this is the last attempt, don't sleep or log
                         if attempt < attempts - 1:
-                            await asyncio.sleep(backoff.calculate(attempt))
+                            delay = backoff.calculate(attempt)
+                            logger.debug(
+                                "Retrying %s (attempt %d/%d) after %s: waiting %.1fs",
+                                func.__name__,
+                                attempt + 2,
+                                attempts,
+                                type(e).__name__,
+                                delay,
+                            )
+                            await asyncio.sleep(delay)
 
                 # Return the last exception we caught
-                return Err(_format_error(last_exception))
+                return Err(_format_error(error))
 
             return async_wrapper
 
         @wraps(func)
         def sync_wrapper(*args, **kwargs):
-            import time
-
-            last_exception = None
+            error = None
             for attempt in range(attempts):
                 try:
                     result = func(*args, **kwargs)
+                    # Log success if we had retries
+                    if attempt > 0:
+                        logger.info(
+                            "%s succeeded after %d attempts", func.__name__, attempt + 1
+                        )
                     return (
                         Ok(result)
                         if not isinstance(result, Result)
                         else result.flatten()
                     )
                 except Exception as e:
-                    last_exception = e
+                    error = e
 
                     # Check if we should stop retrying
-                    if _should_stop_retrying_sync(e, attempt):
+                    if _should_stop_sync(e, attempt):
                         return Err(_format_error(e))
 
-                    # If this is the last attempt, don't sleep
+                    # If this is the last attempt, don't sleep or log
                     if attempt < attempts - 1:
-                        time.sleep(backoff.calculate(attempt))
+                        delay = backoff.calculate(attempt)
+                        logger.debug(
+                            "Retrying %s (attempt %d/%d) after %s: waiting %.1fs",
+                            func.__name__,
+                            attempt + 2,
+                            attempts,
+                            type(e).__name__,
+                            delay,
+                        )
+                        time.sleep(delay)
 
             # Return the last exception we caught
-            return Err(_format_error(last_exception))
+            return Err(_format_error(error))
 
         return sync_wrapper
 
     return decorator
-
-
-def compose(*decorators):
-    """Compose decorators beautifully - right to left application."""
-
-    def composed(func):
-        for decorator in reversed(decorators):
-            func = decorator(func)
-        return func
-
-    return composed
 
 
 class Resilient:
@@ -146,22 +176,24 @@ class Resilient:
 
         # Called as @resilient() or @resilient(params)
         retry_policy = retry if retry is not None else Retry()
-        backoff_policy = backoff if backoff is not None else Backoff.exp()
+        backoff_policy = backoff if backoff is not None else Backoff.fixed(1.0)
 
         # Handle timeout from retry policy or direct parameter
         timeout_seconds = timeout or (retry_policy.timeout if retry else None)
 
         if timeout_seconds:
-            # Compose timeout + retry
-            return compose(
-                self.timeout(timeout_seconds),
-                globals()["retry"](
+            # Manual composition since we deleted compose()
+            def decorator(func):
+                # Apply timeout first, then retry
+                timeout_func = self.timeout(timeout_seconds)(func)
+                return globals()["retry"](
                     attempts=retry_policy.attempts,
                     backoff=backoff_policy,
                     error_type=error_type,
                     handler=handler,
-                ),
-            )
+                )(timeout_func)
+
+            return decorator
         # Just retry
         return globals()["retry"](
             attempts=retry_policy.attempts,
@@ -172,35 +204,26 @@ class Resilient:
 
     # Direct pattern access
     @staticmethod
-    def retry(attempts: int = 3, **kwargs):
+    def retry(attempts: int = RETRY_ATTEMPTS, **kwargs):
         """@resilient.retry - Pure retry logic."""
         return retry(attempts, **kwargs)
 
     @staticmethod
-    def timeout(seconds: float, error_type: type = TimeoutError):
+    def timeout(seconds: float = TIMEOUT_SECONDS, error_type: type = TimeoutError):
         """@resilient.timeout - Pure timeout logic."""
-        from .timeout import timeout
-
         return timeout(seconds, error_type)
 
     @staticmethod
-    def circuit(failures: int = 3, window: int = 300):
+    def circuit(failures: int = CIRCUIT_FAILURES, window: int = CIRCUIT_WINDOW):
         """@resilient.circuit - Circuit breaker that returns Result types."""
-        from .circuit import circuit
-
         return circuit(failures, window)
 
     @staticmethod
-    def rate_limit(rps: float = 1.0, burst: int = None):
+    def rate_limit(rps: float = RATE_LIMIT_RPS, burst: int = None):
         """@resilient.rate_limit - Rate limiting with Result wrapper."""
-        import asyncio
-        from functools import wraps
-
-        from .rate_limit import rate_limit
 
         def result_wrapper(func):
             rate_limit_func = rate_limit(rps, burst)(func)
-            from .result import Ok, Result
 
             if asyncio.iscoroutinefunction(func):
 
@@ -219,22 +242,6 @@ class Resilient:
             return sync_wrapper
 
         return result_wrapper
-
-    # Composition helpers - common patterns
-    @classmethod
-    def api(cls, attempts: int = 3, timeout_s: float = 30.0):
-        """@resilient.api - Common API pattern: timeout + retry."""
-        return compose(cls.timeout(timeout_s), cls.retry(attempts))
-
-    @classmethod
-    def db(cls, attempts: int = 5, timeout_s: float = 60.0):
-        """@resilient.db - Database pattern: timeout + retry."""
-        return compose(cls.timeout(timeout_s), cls.retry(attempts))
-
-    @classmethod
-    def protected(cls, attempts: int = 3, failures: int = 5, window: int = 300):
-        """@resilient.protected - Full protection: circuit + retry."""
-        return compose(cls.circuit(failures, window), cls.retry(attempts))
 
 
 # Create instance for beautiful usage

@@ -3,11 +3,12 @@
 import asyncio
 from functools import wraps
 
+from .defaults import TIMEOUT_SECONDS
 from .result import Err, Ok, Result
 
 
-def timeout(seconds: float, error_type: type = TimeoutError):
-    """Pure timeout decorator - orthogonal to all other patterns."""
+def timeout(seconds: float = TIMEOUT_SECONDS, error_type: type = TimeoutError):
+    """30s timeout - reasonable everywhere."""
 
     def decorator(func):
         if asyncio.iscoroutinefunction(func):

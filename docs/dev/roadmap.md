@@ -1,28 +1,6 @@
 # Roadmap
 
-## v0.4.0 - Current ✅
-
-**Canonical Result API - 3 methods only:**
-- Removed `.is_ok()`, `.is_err()`, `.unwrap_err()`, standalone `unwrap()`
-- Removed `.data` property (use `.unwrap()` for extraction)
-- Kept `.success`/`.failure` for status, `.error` for inspection, `.unwrap()` for extraction
-- **One clear way to do each thing** - eliminates AI confusion patterns
-
-## v0.4.1 - Immediate
-
-**Retry Visibility (Critical):**
-Based on real-world feedback from Cogency integration - silent 5-minute retry delays break development experience.
-
-```python
-@retry(attempts=5, on_retry=lambda attempt, error: 
-       print(f"🔄 Retry {attempt}/5: {error}"))
-
-# Built-in feedback modes
-@retry(attempts=5, feedback=RetryFeedback.PROGRESS)  # 🔄 indicators  
-@retry(attempts=5, feedback=RetryFeedback.VERBOSE)   # Full details
-```
-
-## v0.5.0 - Production Enhancements
+## v0.5.0 - Next
 
 **Circuit Breaker Evolution:**
 - Half-open state for graceful recovery testing
@@ -57,7 +35,6 @@ async def complex_operation(): ...
 ```
 
 **Quality Improvements:**
-- Jitter for backoff strategies (prevent thundering herd)
 - Connection pool awareness for network operations
 - Graceful degradation patterns with automatic fallbacks
 
